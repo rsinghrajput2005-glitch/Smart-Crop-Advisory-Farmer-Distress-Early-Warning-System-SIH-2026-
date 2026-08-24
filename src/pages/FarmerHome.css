@@ -1,0 +1,298 @@
+.farmer-home {
+  padding-bottom: 24px;
+}
+
+.farmer-greeting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.farmer-greeting-text h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.farmer-greeting-text h1 span {
+  color: var(--color-primary);
+}
+
+.farmer-greeting-text p {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.farmer-crop-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--color-surface);
+  padding: 12px 20px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--color-border);
+}
+
+.farmer-crop-badge .crop-icon {
+  width: 42px;
+  height: 42px;
+  background: #E8F5E9;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary);
+}
+
+.farmer-crop-badge .crop-details {
+  font-size: 0.85rem;
+}
+
+.farmer-crop-badge .crop-details strong {
+  display: block;
+  font-size: 1rem;
+  color: var(--color-text);
+}
+
+.farmer-crop-badge .crop-details span {
+  color: var(--color-text-secondary);
+}
+
+.home-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.home-main {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.home-section {
+  margin-bottom: 20px;
+}
+
+.home-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.home-section-header .section-title {
+  margin-bottom: 0;
+}
+
+.view-all-link {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-primary);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  transition: background 0.2s;
+}
+
+.view-all-link:hover {
+  background: #E8F5E9;
+}
+
+.home-risk-overview {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 20px;
+  border: 2px solid var(--color-high);
+  background: #FFF8F0;
+}
+
+.home-risk-text {
+  flex: 1;
+}
+
+.home-risk-text h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.home-risk-text p {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+.home-advisory-highlight {
+  padding: 24px;
+  border-left: 4px solid #C62828;
+  background: #FFF5F5;
+}
+
+.advisory-highlight-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.advisory-highlight-badge.priority-HIGH {
+  background: #FFEBEE;
+  color: #C62828;
+}
+
+.advisory-highlight-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: 8px;
+}
+
+.advisory-highlight-explain {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+.home-mandi-highlight {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: #E8F5E9;
+  border-radius: var(--radius-md);
+  border: 1px solid #C8E6C9;
+}
+
+.home-mandi-highlight .mandi-icon {
+  width: 48px;
+  height: 48px;
+  background: var(--color-primary);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  flex-shrink: 0;
+}
+
+.home-mandi-highlight .mandi-info {
+  flex: 1;
+}
+
+.home-mandi-highlight .mandi-label {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 2px;
+}
+
+.home-mandi-highlight .mandi-price {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.home-mandi-highlight .mandi-name {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+.home-quick-nav {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.quick-nav-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 14px;
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--color-border);
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.quick-nav-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+  border-color: var(--color-primary-lighter);
+}
+
+.quick-nav-card .nav-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #E8F5E9;
+  color: var(--color-primary);
+}
+
+.quick-nav-card .nav-card-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.quick-nav-card .nav-card-desc {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 768px) {
+  .home-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .home-main {
+    grid-template-columns: 1fr;
+  }
+
+  .home-risk-overview {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .home-quick-nav {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .farmer-greeting {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .home-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .home-quick-nav {
+    grid-template-columns: 1fr;
+  }
+}
