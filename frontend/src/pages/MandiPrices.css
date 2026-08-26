@@ -1,0 +1,74 @@
+.mandi-page .mandi-header-card {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  color: #FFFFFF;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.mandi-header-info h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.mandi-header-info p {
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+
+.mandi-header-best {
+  text-align: right;
+}
+
+.mandi-header-best .best-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+  margin-bottom: 2px;
+}
+
+.mandi-header-best .best-price {
+  font-size: 2.2rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.mandi-header-best .best-mandi {
+  font-size: 0.8rem;
+  opacity: 0.85;
+  margin-top: 2px;
+}
+
+.mandi-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.mandi-count {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 768px) {
+  .mandi-page .mandi-header-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .mandi-header-best {
+    text-align: left;
+  }
+
+  .mandi-header-best .best-price {
+    font-size: 1.5rem;
+  }
+}
