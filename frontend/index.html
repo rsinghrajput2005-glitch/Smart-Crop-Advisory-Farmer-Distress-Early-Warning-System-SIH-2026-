@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KrishiMitra — Smart Crop Advisory & Farmer Distress Early-Warning System</title>
+    <meta name="description" content="AI-powered multilingual crop advisory platform combining weather, soil, satellite NDVI, and mandi prices for Indian farmers. Real-time distress risk prediction with officer alerts.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ░░░ SIDEBAR ░░░ -->
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+        <div class="brand-icon">🌾</div>
+        <div class="brand-text">
+            <h1>KrishiMitra</h1>
+            <p>Smart Crop Advisory</p>
+        </div>
+    </div>
+
+    <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" data-page="home" id="nav-home">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-label">Farmer Home</span>
+        </a>
+        <a href="#" class="nav-item" data-page="weather" id="nav-weather">
+            <span class="nav-icon">🌦️</span>
+            <span class="nav-label">Weather</span>
+        </a>
+        <a href="#" class="nav-item" data-page="advisory" id="nav-advisory">
+            <span class="nav-icon">🚜</span>
+            <span class="nav-label">Crop Advisory</span>
+        </a>
+        <a href="#" class="nav-item" data-page="mandi" id="nav-mandi">
+            <span class="nav-icon">📊</span>
+            <span class="nav-label">Mandi Market</span>
+        </a>
+        <a href="#" class="nav-item" data-page="risk" id="nav-risk">
+            <span class="nav-icon">⚠️</span>
+            <span class="nav-label">Distress Risk</span>
+        </a>
+        <a href="#" class="nav-item" data-page="officer" id="nav-officer">
+            <span class="nav-icon">🚨</span>
+            <span class="nav-label">Officer Dashboard</span>
+            <span class="alert-badge hidden" id="officer-badge">0</span>
+        </a>
+        <a href="#" class="nav-item" data-page="chatbot" id="nav-chatbot">
+            <span class="nav-icon">💬</span>
+            <span class="nav-label">Advisory Chat</span>
+        </a>
+    </nav>
+
+    <div class="sidebar-footer">
+        <div class="language-selector">
+            <label for="lang-select">🌐 Language</label>
+            <select id="lang-select">
+                <option value="en">English</option>
+                <option value="hi">हिंदी (Hindi)</option>
+                <option value="te">తెలుగు (Telugu)</option>
+                <option value="ta">தமிழ் (Tamil)</option>
+                <option value="bn">বাংলা (Bengali)</option>
+                <option value="mr">मराठी (Marathi)</option>
+                <option value="or">ଓଡ଼ିଆ (Odia)</option>
+            </select>
+        </div>
+        <p class="sidebar-credit">SIH 2026 — Agriculture Theme</p>
+    </div>
+</aside>
+
+<!-- ░░░ MAIN CONTENT ░░░ -->
+<div class="main-content">
+
+    <!-- Top Bar -->
+    <header class="topbar">
+        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle Sidebar">☰</button>
+        <div class="topbar-title" id="page-title">Farmer Home</div>
+        <div class="topbar-actions">
+            <button class="tts-btn" id="tts-btn" title="Read aloud">🔊 Read</button>
+            <div class="status-indicator" id="api-status">
+                <span class="status-dot"></span>
+                <span>API Status</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- ░░░ PAGE: HOME ░░░ -->
+    <section class="page active" id="page-home">
+        <div class="page-hero">
+            <div class="hero-content">
+                <div class="hero-badge">🇮🇳 SIH 2026 · Agriculture &amp; FoodTech</div>
+                <h2>नमस्ते किसान भाई! 🌱</h2>
+                <p>Enter your farm details for AI-powered crop advisory, distress risk prediction, and live mandi price comparison.</p>
+            </div>
+            <div class="hero-visual">
+                <div class="hero-orb"></div>
+            </div>
+        </div>
+
+        <div class="form-card">
+            <div class="form-card-header">
+                <h3>📍 Farm Details</h3>
+                <button class="gps-btn" id="gps-btn" title="Detect my location">
+                    📡 Detect Location
+                </button>
+            </div>
+
+            <form id="advisory-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="lat">Latitude</label>
+                        <input type="number" step="any" id="lat" value="20.2961" placeholder="e.g. 20.2961" required>
+                        <span class="form-hint">Farm GPS latitude</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="lon">Longitude</label>
+                        <input type="number" step="any" id="lon" value="85.8245" placeholder="e.g. 85.8245" required>
+                        <span class="form-hint">Farm GPS longitude</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="location-name">Location Name</label>
+                        <input type="text" id="location-name" value="Bhubaneswar, Odisha" placeholder="Village / District">
+                    </div>
+                    <div class="form-group">
+                        <label for="crop">Crop</label>
+                        <select id="crop" required>
+                            <option value="rice">🌾 Rice (Paddy)</option>
+                            <option value="wheat">🌾 Wheat</option>
+                            <option value="maize">🌽 Maize (Corn)</option>
+                            <option value="tomato">🍅 Tomato</option>
+                            <option value="onion">🧅 Onion</option>
+                            <option value="soybean">🫘 Soybean</option>
+                            <option value="mustard">🌼 Mustard</option>
+                            <option value="potato">🥔 Potato</option>
+                            <option value="sugarcane">🎋 Sugarcane</option>
+                            <option value="cotton">☁️ Cotton</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="growth-stage">Growth Stage</label>
+                        <select id="growth-stage" required>
+                            <option value="germination">🌱 Germination / Sowing</option>
+                            <option value="tillering">🌿 Tillering / Vegetative</option>
+                            <option value="vegetative">🍃 Vegetative Growth</option>
+                            <option value="flowering">🌸 Flowering / Booting</option>
+                            <option value="grain_filling">🌾 Grain Filling / Pod Fill</option>
+                            <option value="harvesting">🚜 Pre-Harvest / Ripening</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="state-filter">State (for Mandi)</label>
+                        <select id="state-filter">
+                            <option value="Odisha">Odisha</option>
+                            <option value="Maharashtra">Maharashtra</option>
+                            <option value="Punjab">Punjab</option>
+                            <option value="Uttar Pradesh">Uttar Pradesh</option>
+                            <option value="Madhya Pradesh">Madhya Pradesh</option>
+                            <option value="Andhra Pradesh">Andhra Pradesh</option>
+                            <option value="Karnataka">Karnataka</option>
+                            <option value="Tamil Nadu">Tamil Nadu</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary" id="submit-btn">
+                        <span class="spinner hidden" id="submit-spinner"></span>
+                        <span id="submit-label">🔍 Analyze My Farm</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Quick Stats (shown before first submit) -->
+        <div class="quick-stats" id="quick-stats">
+            <div class="stat-card">
+                <div class="stat-icon">🌍</div>
+                <div class="stat-value">SoilGrids</div>
+                <div class="stat-label">Real Soil Data</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🛰️</div>
+                <div class="stat-value">Sentinel-2</div>
+                <div class="stat-label">NDVI Satellite</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🌡️</div>
+                <div class="stat-value">Open-Meteo</div>
+                <div class="stat-label">Weather API</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">💰</div>
+                <div class="stat-value">AGMARKNET</div>
+                <div class="stat-label">Mandi Prices</div>
+            </div>
+        </div>
+
+        <!-- Loading overlay -->
+        <div class="loading-overlay hidden" id="loading-overlay">
+            <div class="loading-card">
+                <div class="loading-spinner"></div>
+                <h3>Analyzing Your Farm...</h3>
+                <div class="loading-steps">
+                    <div class="loading-step" id="step-soil">🌍 Fetching soil data...</div>
+                    <div class="loading-step" id="step-weather">🌦️ Getting weather conditions...</div>
+                    <div class="loading-step" id="step-ndvi">🛰️ Computing NDVI health score...</div>
+                    <div class="loading-step" id="step-mandi">💰 Checking mandi prices...</div>
+                    <div class="loading-step" id="step-ai">🤖 Running AI analysis...</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ░░░ PAGE: WEATHER ░░░ -->
+    <section class="page" id="page-weather">
+        <div class="page-header">
+            <h2>🌦️ Weather Conditions</h2>
+            <p>Real-time weather data and 5-day agricultural forecast</p>
+        </div>
+
+        <div class="weather-current-card" id="weather-current-card">
+            <div class="weather-placeholder">
+                <p>Submit the farm form to load weather data.</p>
+            </div>
+        </div>
+
+        <div class="forecast-grid" id="forecast-grid">
+            <!-- Forecast cards inserted by JS -->
+        </div>
+
+        <div class="weather-risk-panel" id="weather-risk-panel">
+            <!-- Risk panel inserted by JS -->
+        </div>
+    </section>
+
+    <!-- ░░░ PAGE: CROP ADVISORY ░░░ -->
+    <section class="page" id="page-advisory">
+        <div class="page-header">
+            <h2>🚜 AI Crop Advisory</h2>
+            <p>ML-powered, stage-specific crop management recommendations</p>
+        </div>
+
+        <div class="advisory-layout">
+            <div class="advisory-main-card" id="advisory-main-card">
+                <div class="advisory-placeholder">
+                    <p>Submit the farm form to get your personalized advisory.</p>
+                </div>
+            </div>
+
+            <div class="advisory-side">
+                <div class="ndvi-card" id="ndvi-card">
+                    <div class="advisory-placeholder">
+                        <p>NDVI data will load here.</p>
+                    </div>
+                </div>
+                <div class="soil-card" id="soil-card">
+                    <div class="advisory-placeholder">
+                        <p>Soil data will load here.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ░░░ PAGE: MANDI MARKET ░░░ -->
+    <section class="page" id="page-mandi">
+        <div class="page-header">
+            <h2>📊 Mandi Market Prices</h2>
+            <p>Live agricultural commodity prices and market comparison</p>
+        </div>
+
+        <div class="mandi-summary-row" id="mandi-summary-row">
+            <div class="advisory-placeholder">
+                <p>Submit the farm form to load mandi price data.</p>
+            </div>
+        </div>
+
+        <div class="mandi-content">
+            <div class="mandi-chart-card">
+                <h3>📈 Price Comparison Across Mandis</h3>
+                <canvas id="mandi-chart" height="200"></canvas>
+            </div>
+            <div class="mandi-table-card">
+                <h3>🏪 Mandi Price Records</h3>
+                <div class="table-wrapper">
+                    <table class="mandi-table" id="mandi-table">
+                        <thead>
+                            <tr>
+                                <th>Mandi / Market</th>
+                                <th>Variety</th>
+                                <th>Min ₹/Q</th>
+                                <th>Modal ₹/Q</th>
+                                <th>Max ₹/Q</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mandi-tbody">
+                            <tr><td colspan="6" class="empty-cell">No data yet.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ░░░ PAGE: DISTRESS RISK ░░░ -->
+    <section class="page" id="page-risk">
+        <div class="page-header">
+            <h2>⚠️ Farmer Distress Risk</h2>
+            <p>Predictive distress score combining weather, NDVI, and price signals</p>
+        </div>
+
+        <div class="risk-layout">
+            <div class="risk-gauge-card">
+                <h3>Distress Risk Score</h3>
+                <div class="gauge-container">
+                    <svg class="gauge-svg" viewBox="0 0 200 120" id="gauge-svg">
+                        <!-- Background arc -->
+                        <path d="M 20 110 A 90 90 0 0 1 180 110" 
+                              fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="16" stroke-linecap="round"/>
+                        <!-- Colored arc -->
+                        <path id="gauge-arc" d="M 20 110 A 90 90 0 0 1 180 110" 
+                              fill="none" stroke="#10b981" stroke-width="16" stroke-linecap="round"
+                              stroke-dasharray="0 283" style="transition: all 1s ease;"/>
+                        <!-- Score text -->
+                        <text id="gauge-score-text" x="100" y="95" text-anchor="middle" 
+                              fill="white" font-size="28" font-weight="700">--</text>
+                        <text x="100" y="113" text-anchor="middle" 
+                              fill="rgba(255,255,255,0.6)" font-size="10">/10 Risk Score</text>
+                    </svg>
+                    <div class="gauge-label" id="gauge-label">
+                        <span class="risk-level-badge" id="risk-level-badge">PENDING</span>
+                    </div>
+                </div>
+
+                <div class="risk-indicators" id="risk-indicators">
+                    <div class="risk-indicator">
+                        <span class="indicator-dot" id="ind-ndvi"></span>
+                        <span>NDVI / Crop Health</span>
+                    </div>
+                    <div class="risk-indicator">
+                        <span class="indicator-dot" id="ind-weather"></span>
+                        <span>Weather Risk</span>
+                    </div>
+                    <div class="risk-indicator">
+                        <span class="indicator-dot" id="ind-price"></span>
+                        <span>Market Price Signal</span>
+                    </div>
+                    <div class="risk-indicator">
+                        <span class="indicator-dot" id="ind-rain"></span>
+                        <span>Rainfall Pattern</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="risk-details-card">
+                <h3>Risk Factors Detected</h3>
+                <ul class="risk-factors-list" id="risk-factors-list">
+                    <li class="empty-factor">Submit farm data to see risk analysis.</li>
+                </ul>
+
+                <div class="officer-alert-panel hidden" id="officer-alert-panel">
+                    <div class="alert-icon">🚨</div>
+                    <div class="alert-content">
+                        <strong>HIGH RISK — Officer Alert Triggered</strong>
+                        <p>This farmer has been flagged for immediate agricultural officer intervention.</p>
+                        <button class="btn-outline" id="view-officer-btn">View Officer Dashboard →</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ░░░ PAGE: OFFICER DASHBOARD ░░░ -->
+    <section class="page" id="page-officer">
+        <div class="page-header">
+            <h2>🚨 Officer Dashboard</h2>
+            <p>High-risk farmer alerts for agricultural officer intervention</p>
+        </div>
+
+        <div class="officer-stats" id="officer-stats">
+            <div class="officer-stat">
+                <div class="officer-stat-value" id="stat-total">0</div>
+                <div class="officer-stat-label">Total Alerts</div>
+            </div>
+            <div class="officer-stat high">
+                <div class="officer-stat-value" id="stat-high">0</div>
+                <div class="officer-stat-label">High Risk</div>
+            </div>
+            <div class="officer-stat medium">
+                <div class="officer-stat-value" id="stat-medium">0</div>
+                <div class="officer-stat-label">Medium Risk</div>
+            </div>
+            <div class="officer-stat reviewed">
+                <div class="officer-stat-value" id="stat-reviewed">0</div>
+                <div class="officer-stat-label">Reviewed</div>
+            </div>
+        </div>
+
+        <div class="officer-table-card">
+            <div class="table-toolbar">
+                <input type="text" id="officer-search" placeholder="🔍 Search by location or crop..." class="search-input">
+                <select id="officer-filter" class="filter-select">
+                    <option value="all">All Alerts</option>
+                    <option value="High">High Risk Only</option>
+                    <option value="Medium">Medium Risk Only</option>
+                </select>
+            </div>
+            <div class="table-wrapper">
+                <table class="officer-table" id="officer-table">
+                    <thead>
+                        <tr>
+                            <th>Farmer / Location</th>
+                            <th>Crop</th>
+                            <th>Risk Level</th>
+                            <th>Risk Score</th>
+                            <th>Key Risk Factors</th>
+                            <th>Timestamp</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="officer-tbody">
+                        <tr>
+                            <td colspan="7" class="empty-cell">
+                                <div class="empty-state">
+                                    <span>✅</span>
+                                    <p>No alerts detected. Farmer distress assessments will appear here.</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- ░░░ PAGE: CHATBOT ░░░ -->
+    <section class="page" id="page-chatbot">
+        <div class="page-header">
+            <h2>💬 Advisory Chatbot</h2>
+            <p>Ask any question about crop management, pests, schemes, or market prices</p>
+        </div>
+
+        <div class="chatbot-layout">
+            <div class="chat-window" id="chat-window">
+                <!-- Chat messages go here -->
+                <div class="chat-message bot-message">
+                    <div class="message-avatar">🌾</div>
+                    <div class="message-bubble">
+                        <p>Namaste! 🙏 I am <strong>KrishiMitra</strong>, your smart crop advisory assistant.</p>
+                        <p>Ask me about <strong>crop management</strong>, <strong>pest control</strong>, <strong>government schemes</strong> (PM-KISAN, Fasal Bima), <strong>fertilizers</strong>, <strong>weather</strong>, or <strong>mandi prices</strong>.</p>
+                        <p class="msg-time">Ready to help you 🌱</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-input-area">
+                <div class="chat-suggestions">
+                    <button class="suggestion-chip" data-msg="How to treat rice blast disease?">Rice Blast Disease</button>
+                    <button class="suggestion-chip" data-msg="PM-KISAN scheme details">PM-KISAN Scheme</button>
+                    <button class="suggestion-chip" data-msg="Urea fertilizer dosage for wheat">Urea for Wheat</button>
+                    <button class="suggestion-chip" data-msg="Flood management tips">Flood Management</button>
+                    <button class="suggestion-chip" data-msg="How to improve soil pH?">Soil pH Fix</button>
+                </div>
+                <div class="chat-input-row">
+                    <button class="voice-btn" id="voice-btn" title="Voice input">🎤</button>
+                    <input type="text" id="chat-input" placeholder="Type your question or click 🎤 for voice..." autocomplete="off">
+                    <button class="send-btn" id="send-btn">Send ↗</button>
+                </div>
+                <div class="voice-status hidden" id="voice-status">🎤 Listening... speak now</div>
+            </div>
+        </div>
+    </section>
+
+</div><!-- /.main-content -->
+
+<!-- Toast notification -->
+<div class="toast hidden" id="toast">
+    <span id="toast-msg"></span>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
