@@ -1,91 +1,53 @@
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
 
 try:
-    from faster_whisper import WhisperModel
-    _FASTER_WHISPER_AVAILABLE = True
-    _FASTER_WHISPER_IMPORT_ERROR = None
-except Exception as _err:
-    WhisperModel = None
-    _FASTER_WHISPER_AVAILABLE = False
-    _FASTER_WHISPER_IMPORT_ERROR = _err
+    from sarvamai import SarvamAI
+except ImportError:  # pragma: no cover
+    SarvamAI = None
 
 
-class SpeechToText:
-    def __init__(self,
-                 model_size:str = "small",
-                 device:str="cpu",
-                 compute_type:str="int8"):
-        if not _FASTER_WHISPER_AVAILABLE:
-            raise ImportError(
-                "faster_whisper is not installed. Install it with `pip install faster-whisper` "
-                f"or run this code in an environment that has it available. Original error: {_FASTER_WHISPER_IMPORT_ERROR}"
-            )
-
-        print("Loading Whisper model...")
-
-        self.model = WhisperModel(
-            model_size,
-            device = device,
-            compute_type = compute_type
-
-        )
-
-        print("Whisper model loaded successfully.")
-
-    def transcribe(self, audio_path: str, language: str | None = None) -> dict:
-        segments, info = self.model.transcribe(
-            audio_path,
-            language=language,
-            beam_size=5
-        )
-
-        text = " ".join(
-            segment.text.strip()
-            for segment in segments
-        ).strip()
-
-        return {
-            "text": text,
-            "language": info.language,
-            "language_probability": round(
-                info.language_probability, 4
-            )
-        }
+BASE_DIR = Path(__file__).resolve().parents[1]
+load_dotenv(BASE_DIR / ".env")
 
 
-class MockSpeechToText:
-    def transcribe(self, audio_path: str, language: str | None = None) -> dict:
-        language = language or "en"
-        return {
-            "text": f"[mock transcription for {os.path.basename(audio_path)}]",
-            "language": language,
-            "language_probability": 1.0,
-        }
-
-_stt = None
+def get_sarvam_client():
+    api_key = os.getenv("SARVAM_API_KEY")
+    if not api_key:
+        raise ValueError("SARVAM_API_KEY is missing from .env")
+    if SarvamAI is None:
+        raise ModuleNotFoundError("sarvamai is not installed.")
+    return SarvamAI(api_subscription_key=api_key)
 
 
-def _get_stt() -> SpeechToText:
-    global _stt
-    if _stt is not None:
-        return _stt
+def transcribe_audio(audio_path, model="saaras:v3", mode="transcribe"):
+    if not os.path.exists(audio_path):
+        raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
-    # If the caller requests a mock (via env var), return the mock implementation.
-    use_mock = os.getenv("SPEECH_USE_MOCK", "").lower() in ("1", "true", "yes")
-    if use_mock:
-        _stt = MockSpeechToText()
-        return _stt
+    client = get_sarvam_client()
+    with open(audio_path, "rb") as audio_file:
+        response = client.speech_to_text.transcribe(file=audio_file, model=model, mode=mode)
 
-    _stt = SpeechToText()
-    return _stt
+    transcript = getattr(response, "transcript", None)
+    if transcript is None and hasattr(response, "result"):
+        transcript = response.result
+    if transcript is None:
+        transcript = str(response)
+
+    return {
+        "text": transcript,
+        "model": model,
+        "mode": mode,
+    }
 
 
-def speech_to_text(
-        audio_path: str,
-        language: str | None = None
-) -> dict:
-    stt = _get_stt()
-    return stt.transcribe(
-        audio_path,
-        language
-    )
+if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) < 2:
+        print("Usage: python speech_to_text.py <audio_file_path>")
+    else:
+        result = transcribe_audio(sys.argv[1])
+        print(result["text"])
