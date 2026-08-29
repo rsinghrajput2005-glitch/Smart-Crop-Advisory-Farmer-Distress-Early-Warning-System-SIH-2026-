@@ -111,34 +111,52 @@ function renderSavedFarms() {
     });
 }
  
-function selectSavedFarm(farmId) {
-    const farm = savedFarms.find(f => f.id === farmId);
-    if (!farm) return;
- 
-    activeFarmId = farmId;
-    renderSavedFarms();
- 
-    // Populate the existing form fields with this farm's saved data
-    document.getElementById('lat').value = farm.latitude;
-    document.getElementById('lon').value = farm.longitude;
-    if (farm.location_name) document.getElementById('location-name').value = farm.location_name;
-    if (farm.crop) document.getElementById('crop').value = farm.crop;
-    if (farm.growth_stage) document.getElementById('growth-stage').value = farm.growth_stage;
-    if (farm.state) document.getElementById('state-filter').value = farm.state;
- 
-    // Move the map marker + label (reuses your existing function)
-    setSelectedFarmLocation(farm.latitude, farm.longitude, farm.location_name || '');
-    if (farmMap) farmMap.setView([farm.latitude, farm.longitude], 12, { animate: true });
- 
-    showToast(`📍 Loaded "${farm.name}"`);
+// ═══════════════════════════════════════════════════════════════════
+// REPLACE your existing saveFarm() and initFarmsUI() functions with
+// these. Also replace the "＋ Save this farm" button's click handler.
+// ═══════════════════════════════════════════════════════════════════
+
+function showSaveFarmInput() {
+    const block = document.getElementById('saved-farms-block');
+    if (!block || document.getElementById('save-farm-inline-form')) return;
+
+    const form = document.createElement('div');
+    form.id = 'save-farm-inline-form';
+    form.className = 'save-farm-inline-form';
+    form.innerHTML = `
+        <input type="text" id="save-farm-name-input" placeholder="Name this farm (e.g. North field)" maxlength="60">
+        <button type="button" class="btn-primary" id="save-farm-confirm-btn">Save</button>
+        <button type="button" class="btn-outline" id="save-farm-cancel-btn">Cancel</button>
+    `;
+
+    document.getElementById('saved-farms-block').appendChild(form);
+
+    const input = document.getElementById('save-farm-name-input');
+    input.focus();
+
+    input.addEventListener('keypress', e => {
+        if (e.key === 'Enter') confirmSaveFarm();
+        if (e.key === 'Escape') hideSaveFarmInput();
+    });
+
+    document.getElementById('save-farm-confirm-btn').addEventListener('click', confirmSaveFarm);
+    document.getElementById('save-farm-cancel-btn').addEventListener('click', hideSaveFarmInput);
 }
- 
-async function saveFarm() {
-    const name = prompt('Name this farm (e.g. "North field", "Home plot"):');
-    if (!name || !name.trim()) return;
- 
+
+function hideSaveFarmInput() {
+    document.getElementById('save-farm-inline-form')?.remove();
+}
+
+async function confirmSaveFarm() {
+    const input = document.getElementById('save-farm-name-input');
+    const name = input?.value.trim();
+    if (!name) {
+        input?.focus();
+        return;
+    }
+
     const payload = {
-        name: name.trim(),
+        name,
         latitude: parseFloat(document.getElementById('lat').value),
         longitude: parseFloat(document.getElementById('lon').value),
         location_name: document.getElementById('location-name').value || null,
@@ -146,7 +164,7 @@ async function saveFarm() {
         growth_stage: document.getElementById('growth-stage').value || null,
         state: document.getElementById('state-filter').value || null,
     };
- 
+
     try {
         const res = await fetch(`${API_BASE}/farms/`, {
             method: 'POST',
@@ -158,7 +176,8 @@ async function saveFarm() {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Could not save farm');
- 
+
+        hideSaveFarmInput();
         showToast(`✅ Saved "${data.name}"`);
         await loadSavedFarms();
         activeFarmId = data.id;
@@ -167,14 +186,14 @@ async function saveFarm() {
         showToast(`❌ ${err.message}`);
     }
 }
- 
+
 function initFarmsUI() {
     const saveBtn = document.getElementById('save-farm-btn');
-    if (saveBtn) saveBtn.addEventListener('click', saveFarm);
- 
+    if (saveBtn) saveBtn.addEventListener('click', showSaveFarmInput);
+
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) logoutBtn.addEventListener('click', () => Auth.logout());
- 
+
     loadSavedFarms();
 }
  
@@ -182,9 +201,9 @@ function initFarmsUI() {
 // INIT
 // ═══════════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
-    // Everything that touches the API or saved farms waits until the
-    // user is authenticated. Non-auth UI (map, nav) can init immediately
-    // since they don't depend on login.
+    // Redirect to login.html immediately if not authenticated.
+    Auth.requireAuth();
+
     initNav();
     initForm();
     initGPS();
@@ -194,14 +213,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initTTS();
     loadVoices();
     checkAPIStatus();
- 
-    initAuthGate(() => {
-        // Runs once logged in (either immediately if a token already
-        // exists, or right after login/signup completes)
-        initFarmsUI();
-    });
+    initFarmsUI();
 });
- 
 // ═══════════════════════════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════════════════════════

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login — KrishiMitra</title>
+<link rel="stylesheet" href="style.css">
+<script src="auth.js"></script>
+</head>
+<body class="auth-page-body">
+
+<div class="auth-page-wrap">
+  <div class="auth-card">
+    <div class="auth-brand">🌱 KrishiMitra</div>
+    <p class="auth-hint" style="text-align:center;margin-bottom:16px;">Log in to your account</p>
+
+    <form id="login-form" class="auth-form">
+      <label>Email</label>
+      <input type="email" id="login-email" required>
+      <label>Password</label>
+      <input type="password" id="login-password" required>
+      <button type="submit" class="btn-primary">Log in</button>
+    </form>
+
+    <div class="auth-error hidden" id="auth-error"></div>
+
+    <p class="auth-hint" style="text-align:center;margin-top:16px;">
+      Don't have an account? <a href="register.html">Sign up</a>
+    </p>
+  </div>
+</div>
+
+<script>
+Auth.redirectIfLoggedIn();
+
+function showAuthError(msg) {
+    const el = document.getElementById('auth-error');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+}
+
+document.getElementById('login-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    document.getElementById('auth-error').classList.add('hidden');
+
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+
+    try {
+        const res = await fetch(`${AUTH_API_BASE}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Login failed');
+        Auth.setToken(data.access_token);
+        window.location.href = 'index.html';
+    } catch (err) {
+        showAuthError(err.message);
+    }
+});
+</script>
+
+</body>
+</html>
