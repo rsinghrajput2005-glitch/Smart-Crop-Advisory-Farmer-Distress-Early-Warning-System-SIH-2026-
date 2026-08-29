@@ -1,0 +1,19 @@
+{
+  "paddy": {
+    "rainfall_deficit_threshold": -20,
+    "high_temperature_threshold": 35,
+    "soil_moisture_low_threshold": 30
+  },
+
+  "tomato": {
+    "rainfall_deficit_threshold": -20,
+    "high_temperature_threshold": 35,
+    "soil_moisture_low_threshold": 30
+  },
+
+  "maize": {
+    "rainfall_deficit_threshold": -20,
+    "high_temperature_threshold": 35,
+    "soil_moisture_low_threshold": 30
+  }
+}
