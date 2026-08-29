@@ -2,7 +2,7 @@ SUPPORTED_LANGUAGES = {
     "English": "en-IN",
     "Hindi": "hi-IN",
     "Bengali": "bn-IN",
-    "Odia": "or-IN",
+    "Odia": "od-IN",
     "Assamese": "as-IN",
     "Marathi": "mr-IN",
     "Gujarati": "gu-IN",
