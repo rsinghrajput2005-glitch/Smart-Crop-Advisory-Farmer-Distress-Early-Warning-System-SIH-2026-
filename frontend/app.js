@@ -28,6 +28,8 @@ const state = {
     listening: false,
     speechSynth: window.speechSynthesis,
     voices: [],
+    currentAudio: null,
+    ttsRequestToken: 0,
 };
 
 // Farm location map state
@@ -100,15 +102,52 @@ function renderSavedFarms() {
     list.innerHTML = savedFarms.map(farm => `
         <span class="saved-farm-chip ${farm.id === activeFarmId ? 'active' : ''}" data-farm-id="${farm.id}">
             📍 ${farm.name}
+            <button type="button" class="farm-chip-delete" data-farm-id="${farm.id}" title="Delete farm" aria-label="Delete ${farm.name}">✕</button>
         </span>
     `).join('');
  
     list.querySelectorAll('.saved-farm-chip').forEach(chip => {
-        chip.addEventListener('click', () => {
+        chip.addEventListener('click', (e) => {
+            if (e.target.closest('.farm-chip-delete')) return;
             const farmId = parseInt(chip.dataset.farmId, 10);
             selectSavedFarm(farmId);
         });
     });
+
+    list.querySelectorAll('.farm-chip-delete').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const farmId = parseInt(btn.dataset.farmId, 10);
+            const farm = savedFarms.find(f => f.id === farmId);
+            deleteFarm(farmId, farm?.name);
+        });
+    });
+}
+
+async function deleteFarm(farmId, farmName = 'this farm') {
+    if (!confirm(`Delete "${farmName}"? This cannot be undone.`)) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/farms/${farmId}`, {
+            method: 'DELETE',
+            headers: { ...Auth.authHeader() },
+        });
+        if (!res.ok) {
+            let msg = 'Could not delete farm';
+            try {
+                const data = await res.json();
+                msg = data.detail || msg;
+            } catch {}
+            throw new Error(msg);
+        }
+
+        savedFarms = savedFarms.filter(f => f.id !== farmId);
+        if (activeFarmId === farmId) activeFarmId = null;
+        renderSavedFarms();
+        showToast(`🗑️ Deleted "${farmName}"`);
+    } catch (err) {
+        showToast(`❌ ${err.message}`);
+    }
 }
  
 // ═══════════════════════════════════════════════════════════════════
@@ -229,7 +268,8 @@ function initNav() {
     });
 
     // Sidebar toggle (mobile)
-    document.getElementById('sidebar-toggle').addEventListener('click', () => {
+    document.getElementById('sidebar-toggle').addEventListener('click', (e) => {
+        e.stopPropagation();
         document.getElementById('sidebar').classList.toggle('open');
     });
 
@@ -983,8 +1023,6 @@ async function sendChatMessage() {
         const data = await fetchChat(msg, crop, stage);
         removeTypingIndicator(typingId);
         appendChatMessage(data.response, 'bot');
-        // TTS: speak the response
-        speakText(data.response);
     } catch (err) {
         removeTypingIndicator(typingId);
         appendChatMessage(
@@ -1001,14 +1039,25 @@ function appendChatMessage(text, role) {
 
     const time = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     const avatar = role === 'user' ? '👨‍🌾' : '🌾';
+    const readBtn = role === 'bot'
+        ? `<button type="button" class="chat-read-btn" title="Read aloud" aria-label="Read message aloud">🔊</button>`
+        : '';
 
     div.innerHTML = `
         <div class="message-avatar">${avatar}</div>
         <div class="message-bubble">
             <p>${text.replace(/\n/g, '<br>').replace(/\|/g, '<br>• ')}</p>
-            <p class="msg-time">${time}</p>
+            <div class="msg-footer">
+                <p class="msg-time">${time}</p>
+                ${readBtn}
+            </div>
         </div>
     `;
+
+    if (role === 'bot') {
+        div.querySelector('.chat-read-btn')?.addEventListener('click', () => speakText(text));
+    }
+
     window_.appendChild(div);
     window_.scrollTop = window_.scrollHeight;
 }
@@ -1099,24 +1148,80 @@ function loadVoices() {
     state.speechSynth?.addEventListener?.('voiceschanged', loadV);
 }
 
-function speakText(text) {
-    if (!state.speechSynth) return;
-    state.speechSynth.cancel();
+async function speakText(text) {
+    if (!text || !text.trim()) return;
 
-    const utter = new SpeechSynthesisUtterance(text);
-    const langCode = LANG_CONFIG[state.language]?.bcp || 'en-IN';
+    // Each call gets a token. If a newer call starts before this one
+    // finishes fetching, this one becomes stale and must not play.
+    const myToken = ++state.ttsRequestToken;
 
-    // Try to find a matching voice
-    const matchedVoice = state.voices.find(v => v.lang === langCode) ||
-        state.voices.find(v => v.lang.startsWith(langCode.split('-')[0])) ||
-        state.voices.find(v => v.lang.includes('IN'));
+    // Stop any currently playing audio before starting new speech.
+    if (state.currentAudio) {
+        state.currentAudio.pause();
+        state.currentAudio = null;
+    }
 
-    if (matchedVoice) utter.voice = matchedVoice;
-    utter.lang = langCode;
-    utter.rate = 0.9;
-    utter.pitch = 1.0;
+    const langName = LANG_CONFIG[state.language]?.name || 'English';
 
-    state.speechSynth.speak(utter);
+    const ttsBtn = document.getElementById('tts-btn');
+    const originalBtnText = ttsBtn?.textContent;
+    if (ttsBtn) {
+        ttsBtn.disabled = true;
+        ttsBtn.textContent = '🔊 Generating...';
+    }
+
+    try {
+        const res = await fetch(`${API_BASE}/tts/speak`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...Auth.authHeader(),
+            },
+            body: JSON.stringify({ text, language: langName }),
+        });
+
+        // A newer speakText() call has started since this fetch began —
+        // drop this one silently so voices don't stack.
+        if (myToken !== state.ttsRequestToken) return;
+
+        if (!res.ok) {
+            let msg = 'Could not generate speech';
+            try {
+                const data = await res.json();
+                msg = data.detail || msg;
+            } catch {}
+            throw new Error(msg);
+        }
+
+        const audioBlob = await res.blob();
+
+        if (myToken !== state.ttsRequestToken) return;
+
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+
+        // Stop anything that slipped in between the fetch and now.
+        if (state.currentAudio) {
+            state.currentAudio.pause();
+        }
+        state.currentAudio = audio;
+
+        audio.addEventListener('ended', () => {
+            URL.revokeObjectURL(audioUrl);
+            if (state.currentAudio === audio) state.currentAudio = null;
+        });
+
+        await audio.play();
+    } catch (err) {
+        if (myToken === state.ttsRequestToken) {
+            showToast(`❌ ${err.message}`);
+        }
+    } finally {
+        if (myToken === state.ttsRequestToken && ttsBtn) {
+            ttsBtn.disabled = false;
+            ttsBtn.textContent = originalBtnText || '🔊 Read';
+        }
+    }
 }
 
 function speakCurrentPage() {
@@ -1153,6 +1258,55 @@ function speakCurrentPage() {
 // GPS DETECTION
 // ═══════════════════════════════════════════════════════════════════
 
+const KNOWN_STATES = [
+    'Odisha', 'Maharashtra', 'Punjab', 'Uttar Pradesh', 'Madhya Pradesh',
+    'Andhra Pradesh', 'Karnataka', 'Tamil Nadu'
+];
+
+async function reverseGeocodeAndFill(lat, lon) {
+    const locationEl = document.getElementById('location-name');
+    const stateEl = document.getElementById('state-filter');
+    const labelEl = document.getElementById('map-selection-label');
+
+    if (locationEl) locationEl.value = 'Detecting location…';
+
+    try {
+        const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1`,
+            { headers: { 'Accept-Language': 'en' } }
+        );
+        if (!res.ok) throw new Error('Reverse geocode failed');
+        const data = await res.json();
+        const address = data.address || {};
+
+        const district = address.county || address.city_district || address.state_district || '';
+        const cityOrTown = address.city || address.town || address.village || '';
+        const stateName = address.state || '';
+
+        const parts = [cityOrTown || district, stateName].filter(Boolean);
+        const label = parts.length ? parts.join(', ') : (data.display_name || `${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+
+        if (locationEl) locationEl.value = label;
+        if (labelEl) labelEl.textContent = `Selected location: ${label}`;
+
+        // Only auto-select the state if it's one we actually support in the dropdown;
+        // otherwise leave the previous value rather than guessing.
+        if (stateEl) {
+            const match = KNOWN_STATES.find(s => s.toLowerCase() === stateName.toLowerCase());
+            if (match) {
+                stateEl.value = match;
+            } else if (stateName) {
+                showToast(`⚠️ Mandi data isn't available for ${stateName} yet — using nearest supported state.`);
+            }
+        }
+    } catch (err) {
+        // Fail quietly with a coordinate-based fallback label; the farmer's
+        // pin placement is still valid even if the address lookup fails.
+        if (locationEl) locationEl.value = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+        if (labelEl) labelEl.textContent = `Selected location: ${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+    }
+}
+
 function setSelectedFarmLocation(lat, lon, label = '') {
     const latValue = Number(lat);
     const lonValue = Number(lon);
@@ -1161,20 +1315,22 @@ function setSelectedFarmLocation(lat, lon, label = '') {
 
     const latEl = document.getElementById('lat');
     const lonEl = document.getElementById('lon');
-    const locationEl = document.getElementById('location-name');
     const labelEl = document.getElementById('map-selection-label');
     const coordsEl = document.getElementById('map-coordinates');
 
     if (latEl) latEl.value = latValue.toFixed(6);
     if (lonEl) lonEl.value = lonValue.toFixed(6);
-
-    const fallbackLabel = `Selected location (${latValue.toFixed(4)}, ${lonValue.toFixed(4)})`;
-    const finalLabel = label || fallbackLabel;
-
-    if (locationEl && !label) locationEl.value = finalLabel;
-    if (locationEl && label) locationEl.value = label;
-    if (labelEl) labelEl.textContent = finalLabel;
     if (coordsEl) coordsEl.textContent = `${latValue.toFixed(6)}, ${lonValue.toFixed(6)}`;
+
+    if (label) {
+        const locationEl = document.getElementById('location-name');
+        if (locationEl) locationEl.value = label;
+        if (labelEl) labelEl.textContent = label;
+    } else {
+        // No explicit label was passed (i.e. a real map click/drag) —
+        // look up the actual place name instead of trusting free text.
+        reverseGeocodeAndFill(latValue, lonValue);
+    }
 
     if (farmMap) {
         farmMap.setView([latValue, lonValue], Math.max(farmMap.getZoom(), 12), { animate: true });

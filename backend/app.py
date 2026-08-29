@@ -12,6 +12,8 @@ from backend.services.weather_service import get_weather_data
 from backend.services.ndvi_service import get_ndvi
 from backend.services.mandi_service import get_mandi_prices
 from backend.inference import get_crop_advisory, get_distress_risk
+from backend.services.advisory_ai import generate_farmer_advisory
+from backend.services.advisory_data import prepare_advisory_data
 
 from backend.management_apis.auth import router as auth_router
 from backend.management_apis.farms import router as farm_router
@@ -20,6 +22,7 @@ from backend.management_apis.weather import router as weather_router
 from backend.management_apis.ndvi import router as ndvi_router
 from backend.management_apis.mandi import router as mandi_router
 from backend.management_apis.chat import router as chat_router
+from backend.management_apis.tts import router as tts_router
 
 app = FastAPI(
     title="Smart Crop Advisory & Farmer Distress Early-Warning System",
@@ -53,6 +56,7 @@ app.include_router(weather_router)
 app.include_router(ndvi_router)
 app.include_router(mandi_router)
 app.include_router(chat_router)
+app.include_router(tts_router)
 
 
 @app.get("/health", tags=["Health"])
@@ -66,30 +70,79 @@ def advisory_endpoint(req: CropAdvisoryRequest):
         soil = get_soil_data(req.lat, req.lon)
         weather = get_weather_data(req.lat, req.lon)
         ndvi_data = get_ndvi(req.lat, req.lon)
-        
+
         soil_ph = soil.get("ph", 7.0)
         organic_carbon = soil.get("organic_carbon", 10.0)
         clay = soil.get("clay", 20.0)
         sand = soil.get("sand", 40.0)
-        
-        rainfall_mm = sum([d.get("rainfall_mm", 0.0) for d in weather.get("forecast", [])])
+
+        forecast = weather.get("forecast", [])
+        rainfall_mm = sum([d.get("rainfall_mm", 0.0) for d in forecast])
         temperature_c = weather.get("current", {}).get("temperature_c", 25.0)
         humidity_pct = weather.get("current", {}).get("humidity_pct", 60.0)
-        
+
         ndvi_val = ndvi_data.get("ndvi_value", 0.5)
-        
-        advisory_text = get_crop_advisory(
-            req.crop, req.growth_stage, soil_ph, organic_carbon, 
-            clay, sand, rainfall_mm, temperature_c, humidity_pct, ndvi_val
+        crop_condition = ndvi_data.get("condition", "Unknown")
+        weather_risk_level = weather.get("weather_risk", {}).get("risk_level", "Medium")
+
+        # Mandi / market data, reused for both distress scoring and advisory context
+        mandi = get_mandi_prices(req.crop, location="Unknown")
+        mandi_modal_price = 2000.0
+        if mandi.get("summary") and mandi["summary"].get("avg_modal_price"):
+            mandi_modal_price = mandi["summary"]["avg_modal_price"]
+        price_trend_pct = mandi.get("price_trend", {}).get("change_pct", 0.0)
+        price_distress_flag = 1 if mandi.get("price_trend", {}).get("distress_signal") else 0
+
+        # Run the same distress-risk logic used by /risk, so /advisory has real risk context
+        risk_level, risk_score, risk_reasons = get_distress_risk(
+            req.crop, "Unknown Location", ndvi_val, crop_condition,
+            weather_risk_level, rainfall_mm, temperature_c, mandi_modal_price,
+            price_trend_pct, price_distress_flag
         )
-        
+
+        farmer = {"crop": req.crop, "crop_stage": req.growth_stage}
+        features = {
+            "temperature": temperature_c,
+            "humidity": humidity_pct,
+            "precipitation": weather.get("current", {}).get("precipitation_mm"),
+            "soil_moisture": None,
+            "rainfall_deviation": None,
+            "heavy_rain": rainfall_mm > 200,
+            "current_market_price": mandi_modal_price,
+            "previous_price": None,
+            "market_price_change": price_trend_pct,
+        }
+        distress = {
+            "score": risk_score,
+            "risk_level": risk_level,
+            "reasons": risk_reasons,
+        }
+        soil_payload = {
+            "available": True,
+            "ph": soil_ph,
+            "nitrogen": soil.get("nitrogen"),
+            "clay_percent": clay,
+            "sand_percent": sand,
+            "silt_percent": soil.get("silt"),
+            "organic_carbon": organic_carbon,
+        }
+
+        advisory_data = prepare_advisory_data(
+            farmer=farmer,
+            features=features,
+            distress=distress,
+            soil=soil_payload,
+        )
+
+        advisory_text = generate_farmer_advisory(advisory_data, language=req.language)
+
         return CropAdvisoryResponse(
             crop=req.crop,
             growth_stage=req.growth_stage,
             advisory=advisory_text,
             soil_summary={"ph": soil_ph, "organic_carbon": organic_carbon},
             weather_summary={"temperature_c": temperature_c, "rainfall_mm": rainfall_mm},
-            ndvi_condition=ndvi_data.get("condition", "Unknown")
+            ndvi_condition=crop_condition,
         )
     except Exception as e:
         traceback.print_exc()

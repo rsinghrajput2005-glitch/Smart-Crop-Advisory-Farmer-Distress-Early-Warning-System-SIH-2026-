@@ -103,8 +103,7 @@
     <section class="page active" id="page-home">
         <div class="page-hero">
             <div class="hero-content">
-                <div class="hero-badge">🇮🇳 SIH 2026 · Agriculture &amp; FoodTech</div>
-                <h2>नमस्ते किसान भाई! 🌱</h2>
+                <h2>Namaste! 🌱</h2>
                 <p>Select your farm location and crop to get localized weather, crop advice, risk insights, and mandi prices.</p>
             </div>
             <div class="hero-visual">
@@ -155,17 +154,18 @@
                 <div class="form-grid">
                     <div class="form-group">
                         <label for="lat">Latitude</label>
-                        <input type="number" step="any" id="lat" value="20.2961" placeholder="e.g. 20.2961" required>
-                        <span class="form-hint">Farm GPS latitude</span>
+                        <input type="number" step="any" id="lat" value="20.2961" placeholder="e.g. 20.2961" readonly required>
+                        <span class="form-hint">Set by clicking the map above</span>
                     </div>
                     <div class="form-group">
                         <label for="lon">Longitude</label>
-                        <input type="number" step="any" id="lon" value="85.8245" placeholder="e.g. 85.8245" required>
-                        <span class="form-hint">Farm GPS longitude</span>
+                        <input type="number" step="any" id="lon" value="85.8245" placeholder="e.g. 85.8245" readonly required>
+                        <span class="form-hint">Set by clicking the map above</span>
                     </div>
                     <div class="form-group">
                         <label for="location-name">Location Name</label>
-                        <input type="text" id="location-name" value="Bhubaneswar, Odisha" placeholder="Village / District">
+                        <input type="text" id="location-name" value="Bhubaneswar, Odisha" placeholder="Auto-filled from map" readonly>
+                        <span class="form-hint">Auto-detected from your map selection</span>
                     </div>
                     <div class="form-group">
                         <label for="crop">Crop</label>
@@ -195,7 +195,7 @@
                     </div>
                     <div class="form-group">
                         <label for="state-filter">State (for Mandi)</label>
-                        <select id="state-filter">
+                        <select id="state-filter" disabled>
                             <option value="Odisha">Odisha</option>
                             <option value="Maharashtra">Maharashtra</option>
                             <option value="Punjab">Punjab</option>
@@ -205,8 +205,10 @@
                             <option value="Karnataka">Karnataka</option>
                             <option value="Tamil Nadu">Tamil Nadu</option>
                         </select>
+                        <span class="form-hint">Auto-detected from your map selection</span>
                     </div>
                 </div>
+
 
                 <div class="form-actions">
                     <button type="submit" class="btn-primary" id="submit-btn">
@@ -215,30 +217,6 @@
                     </button>
                 </div>
             </form>
-        </div>
-
-        <!-- Quick Stats (shown before first submit) -->
-        <div class="quick-stats" id="quick-stats">
-            <div class="stat-card">
-                <div class="stat-icon">🌍</div>
-                <div class="stat-value">SoilGrids</div>
-                <div class="stat-label">Real Soil Data</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">🛰️</div>
-                <div class="stat-value">Sentinel-2</div>
-                <div class="stat-label">NDVI Satellite</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">🌡️</div>
-                <div class="stat-value">Open-Meteo</div>
-                <div class="stat-label">Weather API</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-icon">💰</div>
-                <div class="stat-value">AGMARKNET</div>
-                <div class="stat-label">Mandi Prices</div>
-            </div>
         </div>
 
         <!-- Loading overlay -->

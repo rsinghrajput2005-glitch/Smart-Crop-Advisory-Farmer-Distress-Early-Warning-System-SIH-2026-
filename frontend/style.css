@@ -504,6 +504,13 @@ body::before {
     background: var(--bg-elevated);
 }
 
+.form-group input[readonly],
+.form-group select:disabled {
+    background: rgba(0,0,0,0.03);
+    color: var(--text-secondary);
+    cursor: not-allowed;
+}
+
 .form-hint {
     font-size: 0.72rem;
     color: var(--text-muted);
@@ -1287,6 +1294,29 @@ body::before {
     margin-top: 8px !important;
 }
 
+.msg-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 8px;
+}
+.msg-footer .msg-time { margin-top: 0 !important; }
+
+.chat-read-btn {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 0.9rem;
+    opacity: 0.6;
+    padding: 2px 4px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+.chat-read-btn:hover {
+    opacity: 1;
+}
+
 .typing-indicator .message-bubble {
     display: flex; gap: 5px; align-items: center;
     padding: 14px 18px;
@@ -1506,7 +1536,7 @@ body::before {
 }
 
 .sidebar {
-    background: linear-gradient(180deg, #173f2a 0%, #123421 100%);
+    background: linear-gradient(180deg, #2b6b47 0%, #1f5238 100%);
     border-right-color: rgba(255,255,255,0.10);
 }
 
@@ -1555,6 +1585,11 @@ body::before {
     background: rgba(255,255,255,0.08);
     border-color: rgba(255,255,255,0.14);
     color: #ffffff;
+}
+
+.language-selector select option {
+    background: #ffffff;
+    color: #1c2b1a;
 }
 
 .topbar {
@@ -2193,7 +2228,10 @@ body::before {
     gap: 8px;
 }
 .saved-farm-chip {
-    padding: 6px 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px 6px 14px;
     background: #fff;
     border: 1px solid #cfe3cf;
     border-radius: 20px;
@@ -2207,6 +2245,29 @@ body::before {
     background: #16a34a;
     color: #fff;
     border-color: #16a34a;
+}
+.farm-chip-delete {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    opacity: 0.6;
+    font-size: 0.75rem;
+    line-height: 1;
+    cursor: pointer;
+}
+.farm-chip-delete:hover {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.12);
+}
+.saved-farm-chip.active .farm-chip-delete:hover {
+    background: rgba(255, 255, 255, 0.25);
 }
 .no-farms-hint {
     font-size: 0.85rem;

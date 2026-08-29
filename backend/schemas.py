@@ -176,6 +176,7 @@ class MandiResponse(BaseModel):
 # Crop Advisory (ML output)
 # ══════════════════════════════════════════════════════════════
 
+
 class CropAdvisoryRequest(BaseModel):
     lat: float = Field(..., ge=-90, le=90)
     lon: float = Field(..., ge=-180, le=180)
@@ -184,8 +185,7 @@ class CropAdvisoryRequest(BaseModel):
         ...,
         description="Growth stage, e.g. Germination, Tillering, Flowering, Harvesting",
     )
-
-
+    language: str = Field("English", description="Language for the generated advisory text")
 class CropAdvisoryResponse(BaseModel):
     crop: str
     growth_stage: str

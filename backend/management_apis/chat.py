@@ -1,15 +1,35 @@
 """
 management_apis/chat.py
 
-Rule-based farmer advisory chatbot endpoint.
-Handles common farmer queries about crop management, weather, pests, and schemes.
-Optional: Set LLM_API_KEY in .env for richer Groq/OpenAI-powered responses.
+Farmer advisory chatbot endpoint.
+Uses Groq (llama-3.1-8b-instant) for richer, context-aware responses when
+GROQ_API_KEY is set in .env. Falls back to the rule-based knowledge base below
+if the key is missing or the LLM call fails for any reason.
 """
 
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
-import os
-import re
+
+import logging
+
+try:
+    from groq import Groq
+except ImportError:  # pragma: no cover
+    Groq = None
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.WARNING)
+
+BASE_DIR = Path(__file__).resolve().parents[2]
+load_dotenv(BASE_DIR / ".env")
+
+_api_key = os.getenv("GROQ_API_KEY")
+_client = Groq(api_key=_api_key) if Groq and _api_key else None
+_MODEL_NAME = "openai/gpt-oss-120b"
 
 router = APIRouter(
     prefix="/chat",
@@ -116,12 +136,11 @@ def _detect_category(message: str) -> str:
 def _find_best_response(message: str, category: str, crop: str | None, growth_stage: str | None) -> str:
     """Find the best matching rule-based response."""
     msg = message.lower()
-    
+
     if category == "pest" or category == "disease":
         for keyword, response in _PEST_RESPONSES.items():
             if keyword in msg:
                 return response
-        # Generic pest response
         if crop:
             return (
                 f"For pest/disease management in {crop}: Scout your field every 3-4 days. "
@@ -130,47 +149,45 @@ def _find_best_response(message: str, category: str, crop: str | None, growth_st
                 "Contact your local Krishi Vigyan Kendra for specific identification and treatment."
             )
         return "Monitor your field regularly. Use ETL-based integrated pest management (IPM). Contact KVK (Krishi Vigyan Kendra) for local pest identification and recommended treatments."
-    
+
     if category == "fertilizer":
         for keyword, response in _FERTILIZER_RESPONSES.items():
             if keyword in msg:
                 return response
         return "Apply fertilizers based on soil test recommendations (Soil Health Card). Follow N:P:K ratio recommended for your crop. Use split nitrogen applications for better uptake. Avoid over-fertilization."
-    
+
     if category == "scheme":
         for keyword, response in _SCHEME_RESPONSES.items():
             if keyword in msg:
                 return response
         return "Key Government Schemes: PM-KISAN (₹6,000/yr), PM Fasal Bima (crop insurance), Kisan Credit Card, e-NAM (digital mandi), Soil Health Card. Call 1800-180-1551 (Kisan Call Center) for more details."
-    
+
     if category == "weather":
         for keyword, response in _WEATHER_RESPONSES.items():
             if keyword in msg:
                 return response
         return "For weather-related decisions: check 5-day forecast in the Weather section of this dashboard. Critical: avoid spraying pesticides/fertilizers on windy or rainy days."
-    
+
     if category == "soil":
         for keyword, response in _SOIL_RESPONSES.items():
             if keyword in msg:
                 return response
         return "Get your Soil Health Card from the district agriculture office. It provides crop-specific fertilizer recommendations. Key parameters: pH (6-7.5 ideal), organic carbon (>0.75%), available N, P, K."
-    
+
     if category == "market":
         return _GENERAL_RESPONSES["mandi"]
-    
-    # General responses
+
     for keyword, response in _GENERAL_RESPONSES.items():
         if keyword in msg:
             return response
-    
-    # Context-aware fallback
+
     if crop and growth_stage:
         return (
             f"For {crop} at {growth_stage} stage: maintain regular field monitoring, "
             "apply inputs as per schedule, and consult the Crop Advisory section for AI-powered recommendations tailored to your field data. "
             "For specific queries, mention keywords like 'pest', 'fertilizer', 'scheme', or 'weather'."
         )
-    
+
     return (
         "I can help with: crop advisory, pest & disease management, fertilizer recommendations, "
         "government schemes, weather impact, soil health, and market prices. "
@@ -178,28 +195,86 @@ def _find_best_response(message: str, category: str, crop: str | None, growth_st
     )
 
 
+def _rule_based_reply(message: str, crop: str | None, growth_stage: str | None) -> tuple[str, str]:
+    """Returns (response_text, category)."""
+    category = _detect_category(message)
+    response_text = _find_best_response(message, category, crop, growth_stage)
+    return response_text, category
+
+
+def _llm_reply(message: str, crop: str | None, growth_stage: str | None, language: str) -> str | None:
+    """Try a Groq-generated reply. Returns None on any failure so the caller can fall back."""
+    if _client is None:
+        if Groq is None:
+            logger.warning("Groq reply skipped: 'groq' package is not installed.")
+        elif not _api_key:
+            logger.warning("Groq reply skipped: GROQ_API_KEY is not set in .env.")
+        return None
+
+    context_lines = []
+    if crop:
+        context_lines.append(f"Farmer's current crop: {crop}")
+    if growth_stage:
+        context_lines.append(f"Current growth stage: {growth_stage}")
+    context = "\n".join(context_lines) if context_lines else "No crop/stage context provided."
+
+    prompt = f"""
+You are an agricultural advisory chatbot for Indian farmers.
+
+{context}
+
+Farmer's question: {message}
+
+Rules:
+1. Only give advice that is safe, practical, and widely accepted agronomic practice for Indian farming conditions.
+2. If the question is about pesticides or fertilizers, mention active ingredient, dose, and any key precaution.
+3. Keep the answer short — 3-6 sentences, no headers, plain conversational text.
+4. If you don't have enough information to answer safely, say so and suggest contacting the local Krishi Vigyan Kendra (KVK) or agriculture extension officer.
+5. Do not invent scheme names, prices, or figures you are not confident about.
+6. Respond in {language if language and language.lower() != "en" else "English"}.
+"""
+
+    try:
+        response = _client.chat.completions.create(
+            model=_MODEL_NAME,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a concise, safe, and practical agricultural advisory assistant for farmers.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.4,
+            max_tokens=400,
+        )
+        content = response.choices[0].message.content
+        return content.strip() if content else None
+    except Exception as exc:
+        logger.warning("Groq chat completion failed: %s", exc)
+        return None
+
+
 @router.post("/", response_model=ChatResponse)
 def chat_endpoint(req: ChatRequest):
     """
-    Rule-based farmer advisory chatbot.
-    
-    Processes farmer queries in natural language and returns actionable advisory.
-    Detects query category (pest, disease, fertilizer, scheme, weather, soil, market)
-    and returns best-match rule-based response.
+    Farmer advisory chatbot.
+
+    Tries a Groq LLM response first (if GROQ_API_KEY is configured) for a
+    richer, context-aware reply. Falls back to the rule-based knowledge base
+    if Groq is unavailable, unconfigured, or the call fails for any reason.
     """
     message = req.message.strip()
     if not message:
         return ChatResponse(
             response="Please enter a question. For example: 'How to treat rice blast disease?'",
             category="general",
-            source="rule-based"
+            source="rule-based",
         )
 
-    category = _detect_category(message)
-    response_text = _find_best_response(message, category, req.crop, req.growth_stage)
+    llm_response = _llm_reply(message, req.crop, req.growth_stage, req.language)
+    if llm_response:
+        category = _detect_category(message)
+        return ChatResponse(response=llm_response, category=category, source="llm")
 
-    return ChatResponse(
-        response=response_text,
-        category=category,
-        source="rule-based"
-    )
+    response_text, category = _rule_based_reply(message, req.crop, req.growth_stage)
+    return ChatResponse(response=response_text, category=category, source="rule-based")

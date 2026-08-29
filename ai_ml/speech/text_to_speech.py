@@ -3,7 +3,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from ai_ml.speech.language_config import get_sarvam_language_code
+from ai_ml.speech.language_config import get_sarvam_language_code, get_language_name
 
 try:
     from sarvamai import SarvamAI
@@ -26,12 +26,47 @@ def get_sarvam_client():
     return SarvamAI(api_subscription_key=api_key)
 
 
-def text_to_speech(text, language="English", output_path=None, speaker="shubh", model="bulbul:v3"):
+def translate_text(text, target_language="English", source_language="English"):
+    """Translate text into target_language using Sarvam's translate API.
+    Returns the original text unchanged if source == target (English default),
+    or if translation fails for any reason (fail-open, so TTS still runs).
+    """
+    if not text or not str(text).strip():
+        return text
+
+    target_name = get_language_name(target_language)
+    source_name = get_language_name(source_language)
+
+    if target_name == source_name:
+        return text
+
+    client = get_sarvam_client()
+    try:
+        response = client.text.translate(
+            input=text,
+            source_language_code=get_sarvam_language_code(source_name),
+            target_language_code=get_sarvam_language_code(target_name),
+        )
+        translated = getattr(response, "translated_text", None)
+        if translated:
+            return translated
+    except Exception:
+        # Fail open: if translation breaks, speak the original text
+        # rather than crashing the whole TTS request.
+        pass
+
+    return text
+
+
+def text_to_speech(text, language="English", output_path=None, speaker="shubh", model="bulbul:v3", auto_translate=True):
     if not text or not str(text).strip():
         raise ValueError("Text is empty. Nothing to convert to speech.")
 
     client = get_sarvam_client()
     language_code = get_sarvam_language_code(language)
+
+    if auto_translate:
+        text = translate_text(text, target_language=language, source_language="English")
 
     if output_path is None:
         output_dir = Path(__file__).resolve().parent / "output"
