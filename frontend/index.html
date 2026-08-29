@@ -103,8 +103,8 @@
     <section class="page active" id="page-home">
         <div class="page-hero">
             <div class="hero-content">
-                <div class="hero-badge">🇮🇳 SIH 2026 · Agriculture &amp; FoodTech</div>
-                <h2>नमस्ते किसान भाई! 🌱</h2>
+                <div class="hero-badge">🇮🇳 Agriculture &amp; FoodTec</div>
+                <h2>Namaste Kisan Bhai!🌱</h2>
                 <p>Select your farm location and crop to get localized weather, crop advice, risk insights, and mandi prices.</p>
             </div>
             <div class="hero-visual">
@@ -153,17 +153,17 @@
             
             <form id="advisory-form">
                 <div class="form-grid">
-                    <div class="form-group">
+                    <div class="form-group" id="la">
                         <label for="lat">Latitude</label>
                         <input type="number" step="any" id="lat" value="20.2961" placeholder="e.g. 20.2961" required>
                         <span class="form-hint">Farm GPS latitude</span>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" id="lo">
                         <label for="lon">Longitude</label>
                         <input type="number" step="any" id="lon" value="85.8245" placeholder="e.g. 85.8245" required>
                         <span class="form-hint">Farm GPS longitude</span>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" id="ln">
                         <label for="location-name">Location Name</label>
                         <input type="text" id="location-name" value="Bhubaneswar, Odisha" placeholder="Village / District">
                     </div>
@@ -193,7 +193,7 @@
                             <option value="harvesting">🚜 Pre-Harvest / Ripening</option>
                         </select>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" id="st">
                         <label for="state-filter">State (for Mandi)</label>
                         <select id="state-filter">
                             <option value="Odisha">Odisha</option>
