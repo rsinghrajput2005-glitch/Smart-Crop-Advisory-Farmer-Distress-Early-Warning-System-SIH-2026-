@@ -93,7 +93,7 @@ body::before {
 .sidebar {
     width: var(--sidebar-w);
     min-height: 100vh;
-    background: linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg-surface) 100%);
+    background: linear-gradient(180deg, #42af48 0%, #28a425 100%);
     border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
