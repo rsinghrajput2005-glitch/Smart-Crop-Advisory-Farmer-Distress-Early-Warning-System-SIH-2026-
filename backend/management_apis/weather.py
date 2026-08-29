@@ -5,7 +5,7 @@ conditions and 7-day forecast with crop weather-risk assessment.
 
 from fastapi import APIRouter, HTTPException, Query
 
-from backend.service_apis.weather_service import get_weather_data
+from backend.services.weather_service import get_weather_data
 
 router = APIRouter(
     prefix="/weather",

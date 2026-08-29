@@ -15,7 +15,7 @@
  *  - GPS auto-detect
  */
 
-const API_BASE = 'https://krishimitra-4nub.onrender.com';
+const API_BASE = 'http://localhost:8000';
 
 // ── State ────────────────────────────────────────────────────────────────────
 const state = {
@@ -122,6 +122,30 @@ function renderSavedFarms() {
             deleteFarm(farmId, farm?.name);
         });
     });
+}
+
+function selectSavedFarm(farmId) {
+    const farm = savedFarms.find(f => f.id === farmId);
+    if (!farm) return;
+
+    activeFarmId = farmId;
+
+    // Restore location — this also updates the map marker/view and
+    // (since a label is passed) skips the reverse-geocode lookup, using
+    // the name that was saved originally.
+    setSelectedFarmLocation(farm.latitude, farm.longitude, farm.location_name || farm.name);
+
+    const stateEl = document.getElementById('state-filter');
+    if (stateEl && farm.state) stateEl.value = farm.state;
+
+    const cropEl = document.getElementById('crop');
+    if (cropEl && farm.crop) cropEl.value = farm.crop;
+
+    const stageEl = document.getElementById('growth-stage');
+    if (stageEl && farm.growth_stage) stageEl.value = farm.growth_stage;
+
+    renderSavedFarms();
+    showToast(`📍 Loaded "${farm.name}"`);
 }
 
 async function deleteFarm(farmId, farmName = 'this farm') {
