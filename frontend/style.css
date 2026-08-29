@@ -8,8 +8,8 @@
 :root {
     /* Core palette */
     --bg-deep:       #f7faf5;
-    --bg-surface:    #ffffff;
-    --bg-elevated:   #eef5ea;
+    --bg-surface:    #15a136;
+    --bg-elevated:    #49931f;
     --bg-card:       rgba(255, 255, 255, 0.98);
     --bg-card-solid: #ffffff;
 
@@ -93,7 +93,7 @@ body::before {
 .sidebar {
     width: var(--sidebar-w);
     min-height: 100vh;
-    background: linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg-surface) 100%);
+    background: linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg-surface) 100%)!important;
     border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
@@ -103,7 +103,10 @@ body::before {
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     overflow-y: auto;
 }
-
+#lang-select {
+    background-color: white;
+    color: black;
+}
 .sidebar-brand {
     display: flex;
     align-items: center;
@@ -466,6 +469,18 @@ body::before {
     gap: 20px;
     padding: 24px 28px;
 }
+#lo{
+   display: none;
+}
+#la{
+   display: none;
+}
+#ln{
+   display: none;
+}
+#st{
+   display: none;
+}
 
 .form-group {
     display: flex;
@@ -519,7 +534,7 @@ body::before {
 .form-actions {
     padding: 0 28px 28px;
     display: flex;
-    justify-content: flex-end;
+    justify-content: center;
 }
 
 /* ── Buttons ──────────────────────────────────────────────────── */
@@ -577,7 +592,7 @@ body::before {
 
 /* ── Quick Stats ──────────────────────────────────────────────── */
 .quick-stats {
-    display: grid;
+    display: none;
     grid-template-columns: repeat(4, 1fr);
     gap: 16px;
 }
