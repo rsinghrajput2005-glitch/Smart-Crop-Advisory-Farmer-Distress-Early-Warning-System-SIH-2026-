@@ -1,309 +1,222 @@
 """
-services/weather_service.py
+Weather service — orchestrates Open-Meteo data fetching and risk assessment.
+Sits between the API router and the external_apis.weather client.
 
-Fetches current weather and 5-day/3-hour forecast from OpenWeatherMap.
-Requires OPENWEATHER_API_KEY set in the .env file.
-
-Free plan docs: https://openweathermap.org/api/one-call-3
-Current weather: https://api.openweathermap.org/data/2.5/weather
-5-day forecast:  https://api.openweathermap.org/data/2.5/forecast
-
-Falls back to realistic mock data when no API key is provided (demo mode).
+If Open-Meteo is unreachable or errors out, falls back to seeded mock data
+so callers always get a usable response instead of a 500/503 — same
+resilience pattern used in soil_service.py.
 """
 
-from __future__ import annotations
-
-import os
+import logging
 import random
 from datetime import datetime, timedelta
 
-import requests
-from dotenv import load_dotenv
+from backend.external_apis.weather import fetch_weather_data
 
-load_dotenv()
+logger = logging.getLogger(__name__)
 
-OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
-
-CURRENT_URL  = "https://api.openweathermap.org/data/2.5/weather"
-FORECAST_URL = "https://api.openweathermap.org/data/2.5/forecast"
-
-# WMO-style condition map (OpenWeatherMap weather ID ranges)
-_CONDITION_MAP = {
-    (200, 299): "Thunderstorm",
-    (300, 399): "Drizzle",
-    (500, 531): "Rain",
-    (600, 622): "Snow",
-    (700, 781): "Haze / Fog",
-    (800, 800): "Clear Sky",
-    (801, 804): "Cloudy",
+# WMO Weather Interpretation Codes (subset)
+WMO_CODE_MAP = {
+    0: "Clear sky",
+    1: "Mainly clear",
+    2: "Partly cloudy",
+    3: "Overcast",
+    45: "Fog",
+    48: "Depositing rime fog",
+    51: "Light drizzle",
+    53: "Moderate drizzle",
+    55: "Dense drizzle",
+    61: "Slight rain",
+    63: "Moderate rain",
+    65: "Heavy rain",
+    71: "Slight snowfall",
+    73: "Moderate snowfall",
+    75: "Heavy snowfall",
+    80: "Slight rain showers",
+    81: "Moderate rain showers",
+    82: "Violent rain showers",
+    95: "Thunderstorm",
+    96: "Thunderstorm with hail",
+    99: "Thunderstorm with heavy hail",
 }
-
-def _weather_id_to_condition(code: int) -> str:
-    for (lo, hi), label in _CONDITION_MAP.items():
-        if lo <= code <= hi:
-            return label
-    return "Unknown"
 
 
 def get_weather_data(lat: float, lon: float) -> dict:
     """
-    Fetch current weather conditions and 5-day forecast for a farm location.
+    Retrieve current weather and 7-day forecast with risk assessment.
 
-    Uses OpenWeatherMap free API tier (requires OPENWEATHER_API_KEY in .env).
-    Falls back to realistic mock data when key is absent (demo mode).
+    Tries the live Open-Meteo API first. If that fails for any reason
+    (network error, timeout, non-2xx response), falls back to seeded
+    mock data so this function never raises for a transient upstream
+    outage — callers always get a usable dict back.
 
     Args:
-        lat: Farm latitude  (-90 to 90).
-        lon: Farm longitude (-180 to 180).
+        lat: Latitude of the farm.
+        lon: Longitude of the farm.
 
     Returns:
-        dict with keys:
-            current      – dict: temperature_c, humidity_pct, rainfall_mm,
-                                  condition, wind_speed_kmh, pressure_hpa
-            forecast     – list of daily summaries
-            weather_risk – dict: risk_level, risk_score, risk_factors
-            source       – data source label
-            units        – unit labels
+        Weather dict with current conditions, 7-day forecast, and weather risk level.
+
+    Raises:
+        ValueError: if coordinates are invalid. This is the only error
+            still raised — bad input is a caller bug, not a transient
+            failure, so it should not be silently papered over.
     """
     if not (-90 <= lat <= 90):
-        raise ValueError(f"Latitude {lat} is out of range (-90 to 90).")
+        raise ValueError(f"Invalid latitude: {lat}.")
     if not (-180 <= lon <= 180):
-        raise ValueError(f"Longitude {lon} is out of range (-180 to 180).")
+        raise ValueError(f"Invalid longitude: {lon}.")
 
-    # ── No API key → return mock data for demo ──────────────────────────────
-    if not OPENWEATHER_API_KEY:
-        return _mock_weather(lat, lon)
-
-    common_params = {
-        "lat": lat,
-        "lon": lon,
-        "appid": OPENWEATHER_API_KEY,
-        "units": "metric",
-    }
-
-    # ── Current weather ──────────────────────────────────────────────────────
     try:
-        current_resp = requests.get(CURRENT_URL, params=common_params, timeout=15)
-        current_resp.raise_for_status()
-    except requests.exceptions.RequestException as exc:
-        # Fallback to mock on any network error
-        return _mock_weather(lat, lon)
-
-    cw = current_resp.json()
-    weather_id = cw["weather"][0]["id"]
-    current = {
-        "temperature_c":     cw["main"]["temp"],
-        "feels_like_c":      cw["main"]["feels_like"],
-        "humidity_pct":      cw["main"]["humidity"],
-        "pressure_hpa":      cw["main"]["pressure"],
-        "rainfall_mm":       cw.get("rain", {}).get("1h", 0.0),
-        "wind_speed_kmh":    round(cw["wind"]["speed"] * 3.6, 2),
-        "wind_direction_deg": cw["wind"].get("deg"),
-        "description":       cw["weather"][0]["description"].title(),
-        "condition":         _weather_id_to_condition(weather_id),
-        "icon":              cw["weather"][0]["icon"],
-        "city":              cw.get("name"),
-        "time":              cw.get("dt"),
-    }
-
-    # ── 5-day / 3-hour forecast → collapse to daily summaries ───────────────
-    try:
-        forecast_resp = requests.get(
-            FORECAST_URL, params={**common_params, "cnt": 40}, timeout=15
+        weather = fetch_weather_data(lat=lat, lon=lon)
+    except Exception as exc:
+        logger.warning(
+            "Live weather API failed for (%s, %s): %s — using fallback mock data.",
+            lat, lon, exc,
         )
-        forecast_resp.raise_for_status()
-    except requests.exceptions.RequestException:
-        forecast = []
-    else:
-        forecast = _parse_forecast(forecast_resp.json().get("list", []))
+        return _mock_weather(lat, lon)
 
-    weather_risk = _compute_weather_risk(current, forecast)
+    # Decode WMO weather code to description
+    current_code = weather["current"].get("weather_code")
+    weather["current"]["condition"] = WMO_CODE_MAP.get(current_code, "Unknown")
 
-    return {
-        "current":      current,
-        "forecast":     forecast,
-        "weather_risk": weather_risk,
-        "source":       "OpenWeatherMap API",
-        "units": {
-            "temperature":  "°C",
-            "rainfall":     "mm",
-            "wind_speed":   "km/h",
-            "pressure":     "hPa",
-        },
-    }
+    for day in weather["forecast"]:
+        day["condition"] = WMO_CODE_MAP.get(day.get("weather_code"), "Unknown")
+
+    # Assess weather risk for crop advisory
+    weather["weather_risk"] = _assess_weather_risk(weather)
+    weather["is_fallback"] = False
+
+    return weather
 
 
-def _parse_forecast(items: list) -> list[dict]:
-    """Collapse 3-hourly forecast entries into one summary per calendar date."""
-    from collections import defaultdict
-
-    daily: dict[str, dict] = defaultdict(lambda: {
-        "temps": [], "rainfall_mm": 0.0, "descriptions": [], "codes": []
-    })
-
-    for item in items:
-        date = item["dt_txt"][:10]
-        daily[date]["temps"].append(item["main"]["temp"])
-        daily[date]["rainfall_mm"] += item.get("rain", {}).get("3h", 0.0)
-        daily[date]["descriptions"].append(item["weather"][0]["description"].title())
-        daily[date]["codes"].append(item["weather"][0]["id"])
-
-    result = []
-    for date, data in sorted(daily.items())[:5]:
-        temps = data["temps"]
-        dominant_code = max(set(data["codes"]), key=data["codes"].count)
-        result.append({
-            "date":          date,
-            "temp_max_c":    round(max(temps), 1),
-            "temp_min_c":    round(min(temps), 1),
-            "rainfall_mm":   round(data["rainfall_mm"], 2),
-            "description":   max(set(data["descriptions"]), key=data["descriptions"].count),
-            "condition":     _weather_id_to_condition(dominant_code),
-        })
-    return result
-
-
-def _compute_weather_risk(current: dict, forecast: list) -> dict:
+def _assess_weather_risk(weather: dict) -> dict:
     """
-    Compute an agricultural weather risk assessment.
-
-    Risk factors considered:
-      - High temperature (>38°C) or Low temperature (<10°C)
-      - High humidity (>85%)
-      - High wind speed (>50 km/h)
-      - Heavy rainfall in forecast (>20 mm/day)
-      - Thunderstorm / cyclone condition
+    Assess weather-related risk level for crop distress model.
 
     Returns:
-        dict with risk_level (Low/Medium/High), risk_score (0–100),
-        and risk_factors (list of strings).
+        dict with risk_level (Low/Medium/High) and risk_factors list.
     """
-    factors = []
-    score = 0
+    risk_factors = []
+    risk_score = 0
 
-    temp = current.get("temperature_c", 25.0)
-    humidity = current.get("humidity_pct", 60.0)
-    wind = current.get("wind_speed_kmh", 10.0)
-    condition = current.get("condition", "")
-    rain = current.get("rainfall_mm", 0.0)
+    current = weather.get("current", {})
+    forecast = weather.get("forecast", [])
 
-    if temp >= 40:
-        factors.append("Extreme heat (≥40°C) — heat stress risk for crops")
-        score += 30
-    elif temp >= 38:
-        factors.append("High temperature (≥38°C) — monitor irrigation")
-        score += 15
-    elif temp <= 5:
-        factors.append("Near-freezing temperature — frost risk")
-        score += 30
-    elif temp <= 10:
-        factors.append("Low temperature (≤10°C) — cold stress possible")
-        score += 15
+    temp = current.get("temperature_c")
+    if temp is not None:
+        if temp > 42:
+            risk_factors.append("Extreme heat stress (>42°C)")
+            risk_score += 3
+        elif temp > 38:
+            risk_factors.append("High temperature stress (>38°C)")
+            risk_score += 2
+        elif temp < 5:
+            risk_factors.append("Cold stress risk (<5°C)")
+            risk_score += 2
 
-    if humidity >= 90:
-        factors.append("Very high humidity (≥90%) — disease/fungal risk")
-        score += 20
-    elif humidity >= 80:
-        factors.append("High humidity (≥80%) — monitor for blight")
-        score += 10
+    humidity = current.get("humidity_pct")
+    if humidity is not None:
+        if humidity > 90:
+            risk_factors.append("Very high humidity — fungal disease risk")
+            risk_score += 2
+        elif humidity < 20:
+            risk_factors.append("Very low humidity — drought stress risk")
+            risk_score += 1
 
-    if wind >= 60:
-        factors.append("Very high wind speed (≥60 km/h) — lodging risk")
-        score += 25
-    elif wind >= 40:
-        factors.append("High wind speed (≥40 km/h) — monitor crops")
-        score += 12
+    total_forecast_rain = sum(
+        d.get("precipitation_sum_mm", 0) or 0 for d in forecast
+    )
+    if total_forecast_rain > 150:
+        risk_factors.append(f"Heavy rainfall forecast: {total_forecast_rain:.1f} mm over 7 days")
+        risk_score += 3
+    elif total_forecast_rain < 5:
+        risk_factors.append("Very low rainfall forecast — irrigation needed")
+        risk_score += 1
 
-    if "Thunderstorm" in condition:
-        factors.append("Active thunderstorm — avoid field operations")
-        score += 25
+    high_wind_days = sum(
+        1 for d in forecast if (d.get("wind_speed_max_kmh") or 0) > 60
+    )
+    if high_wind_days > 0:
+        risk_factors.append(f"High wind days in forecast: {high_wind_days}")
+        risk_score += high_wind_days
 
-    # Check forecast for heavy rain days
-    heavy_rain_days = [
-        d["date"] for d in forecast if d.get("rainfall_mm", 0) > 20
-    ]
-    if len(heavy_rain_days) >= 3:
-        factors.append(f"Heavy rainfall forecast for {len(heavy_rain_days)} days — waterlogging risk")
-        score += 20
-    elif heavy_rain_days:
-        factors.append(f"Heavy rainfall forecast on {', '.join(heavy_rain_days)}")
-        score += 10
-
-    # Erratic rainfall: check if some days have 0mm and others >15mm
-    rain_amounts = [d.get("rainfall_mm", 0) for d in forecast]
-    if rain_amounts:
-        if max(rain_amounts) > 15 and min(rain_amounts) == 0 and len(rain_amounts) >= 3:
-            factors.append("Erratic rainfall pattern — uneven crop water availability")
-            score += 10
-
-    score = min(score, 100)
-
-    if score >= 50:
+    if risk_score >= 6:
         risk_level = "High"
-    elif score >= 25:
+    elif risk_score >= 3:
         risk_level = "Medium"
     else:
         risk_level = "Low"
 
-    if not factors:
-        factors.append("No significant weather risks detected")
-
     return {
-        "risk_level":   risk_level,
-        "risk_score":   score,
-        "risk_factors": factors,
+        "risk_level": risk_level,
+        "risk_score": risk_score,
+        "risk_factors": risk_factors,
     }
 
 
-# ── Mock weather (demo / no-API-key mode) ────────────────────────────────────
+# ── Fallback mock weather (used only when Open-Meteo is unreachable) ────────
 
 def _mock_weather(lat: float, lon: float) -> dict:
-    """Return realistic mock weather data for demo purposes."""
-    random.seed(int(abs(lat * 1000 + lon * 100)) % 9999)
+    """
+    Return seeded, location-stable mock weather data shaped exactly like the
+    live Open-Meteo response, so callers (advisory/risk endpoints, frontend)
+    don't need any special-casing when the live API is down.
+    """
+    # Seed on coordinates so the same farm location gets consistent demo
+    # numbers across repeated calls, instead of random values each time.
+    rng = random.Random(int(abs(lat * 1000 + lon * 100)) % 999999)
 
-    temp = round(random.uniform(24.0, 36.0), 1)
-    humidity = random.randint(55, 85)
-    wind = round(random.uniform(8.0, 28.0), 1)
+    temp = round(rng.uniform(22.0, 36.0), 1)
+    humidity = rng.randint(45, 85)
+    pressure = 1008 + rng.randint(-6, 6)
+    wind = round(rng.uniform(6.0, 22.0), 1)
+    current_code = rng.choice([0, 1, 2, 3, 61, 80])
 
     current = {
-        "temperature_c":     temp,
-        "feels_like_c":      round(temp + random.uniform(1.0, 3.0), 1),
-        "humidity_pct":      humidity,
-        "pressure_hpa":      1010 + random.randint(-5, 5),
-        "rainfall_mm":       round(random.uniform(0.0, 4.0), 2),
-        "wind_speed_kmh":    wind,
-        "wind_direction_deg": random.randint(0, 360),
-        "description":       random.choice(["Partly Cloudy", "Clear Sky", "Light Rain", "Overcast"]),
-        "condition":         random.choice(["Cloudy", "Clear Sky", "Rain"]),
-        "icon":              "02d",
-        "city":              "Demo Location",
-        "time":              int(datetime.utcnow().timestamp()),
+        "temperature_c": temp,
+        "feels_like_c": round(temp + rng.uniform(0.5, 2.5), 1),
+        "humidity_pct": humidity,
+        "precipitation_mm": round(rng.uniform(0.0, 3.0), 2),
+        "wind_speed_kmh": wind,
+        "wind_direction_deg": rng.randint(0, 360),
+        "pressure_hpa": pressure,
+        "weather_code": current_code,
+        "condition": WMO_CODE_MAP.get(current_code, "Unknown"),
+        "time": datetime.utcnow().isoformat(),
     }
 
     forecast = []
-    base_rain_pattern = [0.0, 2.5, 18.0, 5.0, 0.0]
-    for i in range(5):
-        day = datetime.utcnow() + timedelta(days=i + 1)
+    for i in range(7):
+        day_date = datetime.utcnow() + timedelta(days=i + 1)
+        day_code = rng.choice([0, 1, 2, 3, 61, 63, 80])
+        t_max = round(temp + rng.uniform(1, 4), 1)
+        t_min = round(temp - rng.uniform(3, 7), 1)
+        precip = round(rng.uniform(0.0, 12.0), 1)
         forecast.append({
-            "date":        day.strftime("%Y-%m-%d"),
-            "temp_max_c":  round(temp + random.uniform(1, 4), 1),
-            "temp_min_c":  round(temp - random.uniform(3, 7), 1),
-            "rainfall_mm": base_rain_pattern[i] + random.uniform(-1, 2),
-            "description": random.choice(["Partly Cloudy", "Light Rain", "Clear"]),
-            "condition":   random.choice(["Cloudy", "Rain", "Clear Sky"]),
+            "date": day_date.strftime("%Y-%m-%d"),
+            "temp_max": t_max,
+            "temp_min": t_min,
+            "precipitation_sum_mm": precip,
+            "rain_sum_mm": precip,
+            "weather_code": day_code,
+            "condition": WMO_CODE_MAP.get(day_code, "Unknown"),
+            "wind_speed_max_kmh": round(rng.uniform(10.0, 35.0), 1),
+            "sunrise": None,
+            "sunset": None,
         })
 
-    weather_risk = _compute_weather_risk(current, forecast)
-
-    return {
-        "current":      current,
-        "forecast":     forecast,
-        "weather_risk": weather_risk,
-        "source":       "Mock Data (Demo Mode — add OPENWEATHER_API_KEY for live data)",
+    weather = {
+        "current": current,
+        "forecast": forecast,
+        "source": "Fallback estimate — live weather API unavailable",
         "units": {
-            "temperature":  "°C",
-            "rainfall":     "mm",
-            "wind_speed":   "km/h",
-            "pressure":     "hPa",
+            "temperature": "°C",
+            "rainfall": "mm",
+            "wind_speed": "km/h",
+            "pressure": "hPa",
         },
+        "is_fallback": True,
     }
+    weather["weather_risk"] = _assess_weather_risk(weather)
+    return weather
