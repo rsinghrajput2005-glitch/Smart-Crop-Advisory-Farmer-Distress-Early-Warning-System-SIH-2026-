@@ -15,7 +15,7 @@
  *  - GPS auto-detect
  */
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = 'https://krishimitra-4nub.onrender.com';
 
 // ── State ────────────────────────────────────────────────────────────────────
 const state = {
