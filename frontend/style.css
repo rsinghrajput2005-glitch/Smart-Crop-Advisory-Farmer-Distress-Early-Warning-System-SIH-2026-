@@ -469,6 +469,18 @@ body::before {
     gap: 20px;
     padding: 24px 28px;
 }
+#lo{
+   display: none;
+}
+#la{
+   display: none;
+}
+#ln{
+   display: none;
+}
+#st{
+   display: none;
+}
 
 .form-group {
     display: flex;
@@ -515,7 +527,7 @@ body::before {
 .form-actions {
     padding: 0 28px 28px;
     display: flex;
-    justify-content: flex-end;
+    justify-content: center;
 }
 
 /* ── Buttons ──────────────────────────────────────────────────── */
@@ -573,7 +585,7 @@ body::before {
 
 /* ── Quick Stats ──────────────────────────────────────────────── */
 .quick-stats {
-    display: grid;
+    display: none;
     grid-template-columns: repeat(4, 1fr);
     gap: 16px;
 }
