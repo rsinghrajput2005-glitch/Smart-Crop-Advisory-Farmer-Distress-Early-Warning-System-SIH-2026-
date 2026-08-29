@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String, BigInteger, Column,  func
+from sqlalchemy import Boolean, DateTime, Integer, String, BigInteger, Column, func
 
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -95,6 +95,12 @@ class Farm(Base):
         nullable=False,
     )
 
+    # Farmer-chosen label for this farm, e.g. "North field", "Home plot"
+    name: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+    )
+
     latitude: Mapped[float] = mapped_column(
         nullable=False,
     )
@@ -103,12 +109,32 @@ class Farm(Base):
         nullable=False,
     )
 
+    # Human-readable place name, e.g. "Bhubaneswar, Odisha" (reverse-geocoded
+    # or typed by the user) — optional since it's just a display convenience.
+    location_name: Mapped[str] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    crop: Mapped[str] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    growth_stage: Mapped[str] = mapped_column(
+        String,
+        nullable=True,
+    )
+
+    # State name, used for mandi price lookups
+    state: Mapped[str] = mapped_column(
+        String,
+        nullable=True,
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
     )
-
-
-
 

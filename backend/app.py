@@ -55,21 +55,9 @@ app.include_router(mandi_router)
 app.include_router(chat_router)
 
 
-@app.get("/", tags=["Health"])
-def root():
-    return {
-        "status": "ok",
-        "message": "Smart Crop Advisory API is running.",
-        "docs": "/docs",
-        "endpoints": {
-            "auth": "/auth",
-            "farms": "/farms",
-            "soil": "/soil",
-            "weather": "/weather",
-            "ndvi": "/ndvi",
-            "mandi": "/mandi/prices",
-        },
-    }
+@app.get("/health", tags=["Health"])
+def health():
+    return {"status": "ok"}
 
 # ── ML Inference Endpoints ────────────────────────────────────────────────────
 @app.post("/advisory", response_model=CropAdvisoryResponse, tags=["ML Inference"])

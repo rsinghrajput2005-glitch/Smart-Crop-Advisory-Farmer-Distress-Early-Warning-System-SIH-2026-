@@ -30,26 +30,32 @@ const state = {
     voices: [],
 };
 
+// Farm location map state
+let farmMap = null;
+let farmMarker = null;
+let farmMapIcon = null;
+const DEFAULT_MAP_POSITION = [20.2961, 85.8245];
+
 // ── Language configs ─────────────────────────────────────────────────────────
 const LANG_CONFIG = {
-    en: { name: 'English',   bcp: 'en-IN',  voiceHint: 'en-IN' },
-    hi: { name: 'Hindi',     bcp: 'hi-IN',  voiceHint: 'hi-IN' },
-    te: { name: 'Telugu',    bcp: 'te-IN',  voiceHint: 'te-IN' },
-    ta: { name: 'Tamil',     bcp: 'ta-IN',  voiceHint: 'ta-IN' },
-    bn: { name: 'Bengali',   bcp: 'bn-IN',  voiceHint: 'bn-IN' },
-    mr: { name: 'Marathi',   bcp: 'mr-IN',  voiceHint: 'mr-IN' },
-    or: { name: 'Odia',      bcp: 'or-IN',  voiceHint: 'en-IN' }, // Odia TTS falls back to en-IN
+    en: { name: 'English', bcp: 'en-IN', voiceHint: 'en-IN' },
+    hi: { name: 'Hindi', bcp: 'hi-IN', voiceHint: 'hi-IN' },
+    te: { name: 'Telugu', bcp: 'te-IN', voiceHint: 'te-IN' },
+    ta: { name: 'Tamil', bcp: 'ta-IN', voiceHint: 'ta-IN' },
+    bn: { name: 'Bengali', bcp: 'bn-IN', voiceHint: 'bn-IN' },
+    mr: { name: 'Marathi', bcp: 'mr-IN', voiceHint: 'mr-IN' },
+    or: { name: 'Odia', bcp: 'or-IN', voiceHint: 'en-IN' }, // Odia TTS falls back to en-IN
 };
 
 // ── Page titles ──────────────────────────────────────────────────────────────
 const PAGE_TITLES = {
-    home:     'Farmer Home',
-    weather:  'Weather Conditions',
+    home: 'Farmer Home',
+    weather: 'Weather Conditions',
     advisory: 'AI Crop Advisory',
-    mandi:    'Mandi Market Prices',
-    risk:     'Farmer Distress Risk',
-    officer:  'Officer Dashboard',
-    chatbot:  'Advisory Chatbot',
+    mandi: 'Mandi Market Prices',
+    risk: 'Farmer Distress Risk',
+    officer: 'Officer Dashboard',
+    chatbot: 'Advisory Chatbot',
 };
 
 // ── Weather icon mapping ─────────────────────────────────────────────────────
@@ -66,21 +72,136 @@ function weatherIcon(condition = '') {
     return '🌤️';
 }
 
+let savedFarms = [];
+let activeFarmId = null;
+ 
+async function loadSavedFarms() {
+    try {
+        const res = await fetch(`${API_BASE}/farms/`, {
+            headers: { ...Auth.authHeader() },
+        });
+        if (!res.ok) throw new Error('Could not load farms');
+        savedFarms = await res.json();
+        renderSavedFarms();
+    } catch (err) {
+        console.error('loadSavedFarms failed:', err);
+    }
+}
+ 
+function renderSavedFarms() {
+    const list = document.getElementById('saved-farms-list');
+    if (!list) return;
+ 
+    if (!savedFarms.length) {
+        list.innerHTML = '<span class="no-farms-hint">No saved farms yet — fill the form below and click "Save this farm".</span>';
+        return;
+    }
+ 
+    list.innerHTML = savedFarms.map(farm => `
+        <span class="saved-farm-chip ${farm.id === activeFarmId ? 'active' : ''}" data-farm-id="${farm.id}">
+            📍 ${farm.name}
+        </span>
+    `).join('');
+ 
+    list.querySelectorAll('.saved-farm-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            const farmId = parseInt(chip.dataset.farmId, 10);
+            selectSavedFarm(farmId);
+        });
+    });
+}
+ 
+function selectSavedFarm(farmId) {
+    const farm = savedFarms.find(f => f.id === farmId);
+    if (!farm) return;
+ 
+    activeFarmId = farmId;
+    renderSavedFarms();
+ 
+    // Populate the existing form fields with this farm's saved data
+    document.getElementById('lat').value = farm.latitude;
+    document.getElementById('lon').value = farm.longitude;
+    if (farm.location_name) document.getElementById('location-name').value = farm.location_name;
+    if (farm.crop) document.getElementById('crop').value = farm.crop;
+    if (farm.growth_stage) document.getElementById('growth-stage').value = farm.growth_stage;
+    if (farm.state) document.getElementById('state-filter').value = farm.state;
+ 
+    // Move the map marker + label (reuses your existing function)
+    setSelectedFarmLocation(farm.latitude, farm.longitude, farm.location_name || '');
+    if (farmMap) farmMap.setView([farm.latitude, farm.longitude], 12, { animate: true });
+ 
+    showToast(`📍 Loaded "${farm.name}"`);
+}
+ 
+async function saveFarm() {
+    const name = prompt('Name this farm (e.g. "North field", "Home plot"):');
+    if (!name || !name.trim()) return;
+ 
+    const payload = {
+        name: name.trim(),
+        latitude: parseFloat(document.getElementById('lat').value),
+        longitude: parseFloat(document.getElementById('lon').value),
+        location_name: document.getElementById('location-name').value || null,
+        crop: document.getElementById('crop').value || null,
+        growth_stage: document.getElementById('growth-stage').value || null,
+        state: document.getElementById('state-filter').value || null,
+    };
+ 
+    try {
+        const res = await fetch(`${API_BASE}/farms/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...Auth.authHeader(),
+            },
+            body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Could not save farm');
+ 
+        showToast(`✅ Saved "${data.name}"`);
+        await loadSavedFarms();
+        activeFarmId = data.id;
+        renderSavedFarms();
+    } catch (err) {
+        showToast(`❌ ${err.message}`);
+    }
+}
+ 
+function initFarmsUI() {
+    const saveBtn = document.getElementById('save-farm-btn');
+    if (saveBtn) saveBtn.addEventListener('click', saveFarm);
+ 
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) logoutBtn.addEventListener('click', () => Auth.logout());
+ 
+    loadSavedFarms();
+}
+ 
 // ═══════════════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════════════
-
 document.addEventListener('DOMContentLoaded', () => {
+    // Everything that touches the API or saved farms waits until the
+    // user is authenticated. Non-auth UI (map, nav) can init immediately
+    // since they don't depend on login.
     initNav();
     initForm();
     initGPS();
+    initFarmMap();
     initChat();
     initOfficerFilters();
     initTTS();
     loadVoices();
     checkAPIStatus();
+ 
+    initAuthGate(() => {
+        // Runs once logged in (either immediately if a token already
+        // exists, or right after login/signup completes)
+        initFarmsUI();
+    });
 });
-
+ 
 // ═══════════════════════════════════════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════════════════════════════════════
@@ -130,6 +251,10 @@ function navigateTo(page) {
     document.getElementById('page-title').textContent = PAGE_TITLES[page] || page;
 
     state.currentPage = page;
+
+    if (page === 'home' && farmMap) {
+        setTimeout(() => farmMap.invalidateSize(), 120);
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -342,7 +467,7 @@ function populateWeather(weather) {
     const panel = document.getElementById('weather-risk-panel');
     const riskLevel = riskData.risk_level || 'Unknown';
     const riskColor = riskLevel === 'High' ? 'var(--risk-high)' :
-                     riskLevel === 'Medium' ? 'var(--risk-medium)' : 'var(--risk-low)';
+        riskLevel === 'Medium' ? 'var(--risk-medium)' : 'var(--risk-low)';
     const factors = riskData.risk_factors || ['No significant weather risks detected.'];
     panel.innerHTML = `
         <h3>🌩 Agricultural Weather Risk: 
@@ -537,9 +662,9 @@ function buildMandiChart(records) {
     if (records.length === 0) return;
 
     const labels = records.map(r => (r.mandi_name || r.market || '').split(' ')[0]);
-    const minPrices   = records.map(r => r.min_price || 0);
+    const minPrices = records.map(r => r.min_price || 0);
     const modalPrices = records.map(r => r.modal_price || 0);
-    const maxPrices   = records.map(r => r.max_price || 0);
+    const maxPrices = records.map(r => r.max_price || 0);
 
     state.mandiChart = new Chart(canvas, {
         type: 'bar',
@@ -617,14 +742,14 @@ function populateRisk(risk, location, crop) {
 
     // Risk indicators (color coded based on factors)
     const priceDistress = factors.some(f => f.toLowerCase().includes('price'));
-    const weatherBad    = factors.some(f => f.toLowerCase().includes('weather'));
-    const ndviBad       = factors.some(f => f.toLowerCase().includes('ndvi'));
-    const rainBad       = factors.some(f => f.toLowerCase().includes('rainfall') || f.toLowerCase().includes('drought'));
+    const weatherBad = factors.some(f => f.toLowerCase().includes('weather'));
+    const ndviBad = factors.some(f => f.toLowerCase().includes('ndvi'));
+    const rainBad = factors.some(f => f.toLowerCase().includes('rainfall') || f.toLowerCase().includes('drought'));
 
-    setIndicator('ind-ndvi',    ndviBad   ? level : 'Low');
+    setIndicator('ind-ndvi', ndviBad ? level : 'Low');
     setIndicator('ind-weather', weatherBad ? level : 'Low');
-    setIndicator('ind-price',   priceDistress ? level : 'Low');
-    setIndicator('ind-rain',    rainBad   ? level : 'Low');
+    setIndicator('ind-price', priceDistress ? level : 'Low');
+    setIndicator('ind-rain', rainBad ? level : 'Low');
 
     // Risk factors list
     const list = document.getElementById('risk-factors-list');
@@ -771,15 +896,15 @@ function markReviewed(id) {
 }
 
 function updateOfficerStats() {
-    const total  = state.alerts.length;
-    const high   = state.alerts.filter(a => a.riskLevel === 'High').length;
+    const total = state.alerts.length;
+    const high = state.alerts.filter(a => a.riskLevel === 'High').length;
     const medium = state.alerts.filter(a => a.riskLevel === 'Medium').length;
-    const rev    = state.alerts.filter(a => a.reviewed).length;
+    const rev = state.alerts.filter(a => a.reviewed).length;
 
-    document.getElementById('stat-total').textContent   = total;
-    document.getElementById('stat-high').textContent    = high;
-    document.getElementById('stat-medium').textContent  = medium;
-    document.getElementById('stat-reviewed').textContent= rev;
+    document.getElementById('stat-total').textContent = total;
+    document.getElementById('stat-high').textContent = high;
+    document.getElementById('stat-medium').textContent = medium;
+    document.getElementById('stat-reviewed').textContent = rev;
 }
 
 function updateOfficerBadge() {
@@ -809,9 +934,9 @@ function initOfficerFilters() {
 // ═══════════════════════════════════════════════════════════════════
 
 function initChat() {
-    const input  = document.getElementById('chat-input');
-    const sendBtn= document.getElementById('send-btn');
-    const voiceBtn=document.getElementById('voice-btn');
+    const input = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('send-btn');
+    const voiceBtn = document.getElementById('voice-btn');
 
     sendBtn?.addEventListener('click', () => sendChatMessage());
     input?.addEventListener('keypress', e => { if (e.key === 'Enter') sendChatMessage(); });
@@ -970,8 +1095,8 @@ function speakText(text) {
 
     // Try to find a matching voice
     const matchedVoice = state.voices.find(v => v.lang === langCode) ||
-                         state.voices.find(v => v.lang.startsWith(langCode.split('-')[0])) ||
-                         state.voices.find(v => v.lang.includes('IN'));
+        state.voices.find(v => v.lang.startsWith(langCode.split('-')[0])) ||
+        state.voices.find(v => v.lang.includes('IN'));
 
     if (matchedVoice) utter.voice = matchedVoice;
     utter.lang = langCode;
@@ -1015,32 +1140,168 @@ function speakCurrentPage() {
 // GPS DETECTION
 // ═══════════════════════════════════════════════════════════════════
 
+function setSelectedFarmLocation(lat, lon, label = '') {
+    const latValue = Number(lat);
+    const lonValue = Number(lon);
+
+    if (!Number.isFinite(latValue) || !Number.isFinite(lonValue)) return;
+
+    const latEl = document.getElementById('lat');
+    const lonEl = document.getElementById('lon');
+    const locationEl = document.getElementById('location-name');
+    const labelEl = document.getElementById('map-selection-label');
+    const coordsEl = document.getElementById('map-coordinates');
+
+    if (latEl) latEl.value = latValue.toFixed(6);
+    if (lonEl) lonEl.value = lonValue.toFixed(6);
+
+    const fallbackLabel = `Selected location (${latValue.toFixed(4)}, ${lonValue.toFixed(4)})`;
+    const finalLabel = label || fallbackLabel;
+
+    if (locationEl && !label) locationEl.value = finalLabel;
+    if (locationEl && label) locationEl.value = label;
+    if (labelEl) labelEl.textContent = finalLabel;
+    if (coordsEl) coordsEl.textContent = `${latValue.toFixed(6)}, ${lonValue.toFixed(6)}`;
+
+    if (farmMap) {
+        farmMap.setView([latValue, lonValue], Math.max(farmMap.getZoom(), 12), { animate: true });
+
+        if (!farmMarker) {
+            if (!farmMapIcon) {
+                farmMapIcon = L.icon({
+                    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+                    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+                    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                    popupAnchor: [1, -34],
+                    shadowSize: [41, 41]
+                });
+            }
+            farmMarker = L.marker([latValue, lonValue], { icon: farmMapIcon }).addTo(farmMap);
+        } else {
+            farmMarker.setLatLng([latValue, lonValue]);
+        }
+
+        farmMarker.bindPopup(`<strong>Farm location</strong><br>${latValue.toFixed(5)}, ${lonValue.toFixed(5)}`).openPopup();
+    }
+}
+
+function initFarmMap() {
+    const mapElement = document.getElementById('farm-map');
+    if (!mapElement || !window.L) {
+        console.warn('Leaflet map could not be initialized.');
+        return;
+    }
+
+    const latInput = parseFloat(document.getElementById('lat')?.value);
+    const lonInput = parseFloat(document.getElementById('lon')?.value);
+    const initialPosition =
+        Number.isFinite(latInput) && Number.isFinite(lonInput)
+            ? [latInput, lonInput]
+            : DEFAULT_MAP_POSITION;
+
+    farmMap = L.map(mapElement, {
+        zoomControl: true,
+        scrollWheelZoom: true,
+        attributionControl: true
+    }).setView(initialPosition, 11);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(farmMap);
+
+    if (!farmMapIcon) {
+        farmMapIcon = L.icon({
+            iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+            iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+            shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+        });
+    }
+
+    farmMarker = L.marker(initialPosition, { icon: farmMapIcon }).addTo(farmMap);
+    farmMarker.bindPopup('<strong>Farm location</strong><br>Drag the map or tap another point to select.').openPopup();
+
+    setSelectedFarmLocation(initialPosition[0], initialPosition[1], document.getElementById('location-name')?.value || '');
+
+    farmMap.on('click', event => {
+        setSelectedFarmLocation(event.latlng.lat, event.latlng.lng);
+        showToast('📍 Farm location selected on map.');
+    });
+
+    document.getElementById('map-current-location')?.addEventListener('click', () => {
+        detectCurrentFarmLocation(true);
+    });
+}
+
+function detectCurrentFarmLocation(showSuccessToast = true) {
+    if (!navigator.geolocation) {
+        showToast('⚠️ Geolocation is not supported in this browser.');
+        return;
+    }
+
+    const gpsBtn = document.getElementById('gps-btn');
+    const mapBtn = document.getElementById('map-current-location');
+
+    if (gpsBtn) {
+        gpsBtn.textContent = '📡 Detecting...';
+        gpsBtn.disabled = true;
+    }
+    if (mapBtn) {
+        mapBtn.textContent = '📡 Detecting...';
+        mapBtn.disabled = true;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        pos => {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+
+            setSelectedFarmLocation(lat, lon);
+
+            if (farmMap) {
+                farmMap.setView([lat, lon], 15, { animate: true });
+            }
+
+            if (gpsBtn) gpsBtn.textContent = '✅ Location Set';
+            if (mapBtn) mapBtn.textContent = '✅ Location Set';
+
+            if (showSuccessToast) showToast('📍 Farm location detected!');
+
+            setTimeout(() => {
+                if (gpsBtn) {
+                    gpsBtn.textContent = '📡 Detect Location';
+                    gpsBtn.disabled = false;
+                }
+                if (mapBtn) {
+                    mapBtn.textContent = '◎ Use my current location';
+                    mapBtn.disabled = false;
+                }
+            }, 1800);
+        },
+        () => {
+            if (gpsBtn) {
+                gpsBtn.textContent = '📡 Detect Location';
+                gpsBtn.disabled = false;
+            }
+            if (mapBtn) {
+                mapBtn.textContent = '◎ Use my current location';
+                mapBtn.disabled = false;
+            }
+            showToast('⚠️ Could not get your location. Check browser permissions.');
+        },
+        { timeout: 10000, enableHighAccuracy: true }
+    );
+}
+
 function initGPS() {
     document.getElementById('gps-btn')?.addEventListener('click', () => {
-        if (!navigator.geolocation) {
-            showToast('⚠️ Geolocation not supported in this browser.');
-            return;
-        }
-        const btn = document.getElementById('gps-btn');
-        btn.textContent = '📡 Detecting...';
-        btn.disabled = true;
-
-        navigator.geolocation.getCurrentPosition(
-            pos => {
-                document.getElementById('lat').value = pos.coords.latitude.toFixed(6);
-                document.getElementById('lon').value = pos.coords.longitude.toFixed(6);
-                document.getElementById('location-name').value = `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
-                btn.textContent = '✅ Location Set';
-                setTimeout(() => { btn.textContent = '📡 Detect Location'; btn.disabled = false; }, 2000);
-                showToast('📍 Location detected!');
-            },
-            err => {
-                btn.textContent = '📡 Detect Location';
-                btn.disabled = false;
-                showToast('⚠️ Could not get location. Check browser permissions.');
-            },
-            { timeout: 10000, enableHighAccuracy: true }
-        );
+        detectCurrentFarmLocation(true);
     });
 }
 

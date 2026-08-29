@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -15,11 +17,32 @@ router = APIRouter(
 
 
 class FarmCreateRequest(BaseModel):
+    name: str
     latitude: float
     longitude: float
+    location_name: str | None = None
+    crop: str | None = None
+    growth_stage: str | None = None
+    state: str | None = None
 
 
-@router.post("/")
+class FarmResponse(BaseModel):
+    id: int
+    user_id: int
+    name: str
+    latitude: float
+    longitude: float
+    location_name: str | None = None
+    crop: str | None = None
+    growth_stage: str | None = None
+    state: str | None = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True  # allows returning ORM objects directly
+
+
+@router.post("/", response_model=FarmResponse)
 def add_farm(
     data: FarmCreateRequest,
     db: Session = Depends(get_db),
@@ -28,12 +51,17 @@ def add_farm(
     return create_farm(
         db=db,
         user_id=user_id,
+        name=data.name,
         latitude=data.latitude,
         longitude=data.longitude,
+        location_name=data.location_name,
+        crop=data.crop,
+        growth_stage=data.growth_stage,
+        state=data.state,
     )
 
 
-@router.get("/")
+@router.get("/", response_model=list[FarmResponse])
 def get_farms(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
@@ -44,7 +72,8 @@ def get_farms(
 
     return farms
 
-@router.get("/{farm_id}")
+
+@router.get("/{farm_id}", response_model=FarmResponse)
 def get_farm(
     farm_id: int,
     db: Session = Depends(get_db),
@@ -64,6 +93,7 @@ def get_farm(
         )
 
     return farm
+
 
 @router.delete("/{farm_id}")
 def delete_farm(

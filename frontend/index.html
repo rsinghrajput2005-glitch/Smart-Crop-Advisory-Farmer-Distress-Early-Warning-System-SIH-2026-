@@ -9,7 +9,16 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIINfQ3wP8d0pN1f7c6xvS4vM3bQ3jQ5Z6M="
+        crossorigin="">
+    <script src="auth.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+ 
 </head>
 <body>
 
@@ -85,6 +94,8 @@
                 <span class="status-dot"></span>
                 <span>API Status</span>
             </div>
+            <button class="btn-outline" id="logout-btn" title="Log out" style="margin-left:8px;">Logout</button>
+ 
         </div>
     </header>
 
@@ -94,7 +105,7 @@
             <div class="hero-content">
                 <div class="hero-badge">🇮🇳 SIH 2026 · Agriculture &amp; FoodTech</div>
                 <h2>नमस्ते किसान भाई! 🌱</h2>
-                <p>Enter your farm details for AI-powered crop advisory, distress risk prediction, and live mandi price comparison.</p>
+                <p>Select your farm location and crop to get localized weather, crop advice, risk insights, and mandi prices.</p>
             </div>
             <div class="hero-visual">
                 <div class="hero-orb"></div>
@@ -109,6 +120,37 @@
                 </button>
             </div>
 
+                        <div class="farm-map-section">
+                <div class="farm-map-header">
+                    <div>
+                        <h4>📍 Select your farm location</h4>
+                        <p>Tap or click on the map to place your farm marker. Your latitude and longitude will update automatically.</p>
+                    </div>
+                    <button type="button" class="map-location-btn" id="map-current-location">
+                        ◎ Use my current location
+                    </button>
+                </div>
+
+                <div class="farm-map" id="farm-map" aria-label="Interactive farm location map"></div>
+
+                <div class="map-selection-bar">
+                    <div class="map-selection-status">
+                        <span class="map-selection-dot"></span>
+                        <span id="map-selection-label">Selected location: Bhubaneswar, Odisha</span>
+                    </div>
+                    <span class="map-coordinates" id="map-coordinates">20.296100, 85.824500</span>
+                </div>
+            </div>
+            <div class="saved-farms-block" id="saved-farms-block">
+                <div class="saved-farms-header">
+                    <h4>📁 Your saved farms</h4>
+                    <button type="button" class="btn-outline" id="save-farm-btn">＋ Save this farm</button>
+                </div>
+                <div class="saved-farms-list" id="saved-farms-list">
+                    <span class="no-farms-hint">No saved farms yet — fill the form below and click "Save this farm".</span>
+                </div>
+            </div>
+            
             <form id="advisory-form">
                 <div class="form-grid">
                     <div class="form-group">
