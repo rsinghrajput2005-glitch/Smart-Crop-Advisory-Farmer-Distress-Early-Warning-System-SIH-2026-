@@ -1,239 +1,189 @@
-# Smart Crop Advisory & Farmer Distress Early-Warning System
+# 🌾 Smart Crop Advisory & Farmer Distress Early-Warning System
 
-## Overview
-A multilingual, low-bandwidth AI platform that combines **soil, weather, Sentinel-2 NDVI, and mandi-price data** to provide crop-stage-specific advisory and early farmer-distress risk detection.
+**Team Pragyan | Smart India Hackathon 2026**
 
-### Farmer Input
-The farmer provides only:
-- Location
+## 📌 Overview
+
+Smart Crop Advisory & Farmer Distress Early-Warning System is an AI-powered agricultural platform that combines **soil, weather, satellite and mandi-price data** to provide personalized, crop-stage-specific advisory and identify potential farmer distress at an early stage.
+
+The farmer only needs to provide **location, crop type and growth stage**. The system automatically collects the required data and generates actionable recommendations.
+
+## 💡 Key Features
+
+- 🌱 Crop-stage-specific advisory
+- 🧪 Location-based soil information using SoilGrids
+- 🌦️ Current weather and forecast-based analysis
+- 🛰️ Sentinel-2 based NDVI and crop-condition monitoring
+- 💰 Current and historical mandi price analysis
+- ⚠️ Farmer distress-risk score
+- 💧 Irrigation advisory
+- 🗣️ Multilingual STT/TTS voice support
+- 📱 Lightweight interface for low-connectivity areas
+
+## 🔄 System Workflow
+
+Farmer Input → Data Collection → Data Processing → AI/ML Analysis → Advisory & Risk Detection → Farmer/Officer Dashboard
+
+The system collects soil data from **SoilGrids**, weather and forecast data from a **Weather API**, crop-condition information from **Sentinel-2**, and market information from **mandi data**. These parameters are processed and combined with crop type and growth stage before being passed to the AI/ML module.
+
+## 🏗️ System Architecture
+
+The system follows a layered architecture where the frontend communicates with the FastAPI backend, which coordinates external agricultural data sources, the database, and AI/ML models.
+
+```text
+                         FARMER
+                           │
+                           ▼
+              ┌─────────────────────┐
+              │      FRONTEND       │
+              │ Web / Mobile UI     │
+              │ Map + Dashboard     │
+              └──────────┬──────────┘
+                         │
+                         ▼
+              ┌─────────────────────┐
+              │   FASTAPI BACKEND   │
+              │ API + Authentication│
+              │ Data Integration    │
+              └──────────┬──────────┘
+                         │
+             ┌───────────┼───────────┐
+             │           │           │
+             ▼           ▼           ▼
+        ┌─────────┐ ┌──────────┐ ┌──────────┐
+        │External │ │PostgreSQL│ │ AI / ML  │
+        │  APIs   │ │ Database │ │  Models  │
+        └────┬────┘ └──────────┘ └────┬─────┘
+             │                        │
+      ┌──────┼─────────┐              │
+      ▼      ▼         ▼              │
+   SoilGrids Weather  Sentinel-2      │
+                     + NDVI           │
+             │                        │
+             ▼                        ▼
+        Mandi Data              Predictions
+             │                        │
+             └───────────┬────────────┘
+                         ▼
+              ┌─────────────────────┐
+              │ ADVISORY ENGINE     │
+              │ Crop Advisory       │
+              │ Irrigation Advice   │
+              │ Distress Risk       │
+              └──────────┬──────────┘
+                         │
+                         ▼
+              ┌─────────────────────┐
+              │  FARMER / OFFICER   │
+              │ Dashboard + Alerts  │
+              │ Text + Voice        │
+              └─────────────────────┘
+
+## 🤖 AI/ML
+
+The AI/ML module uses parameters such as:
+
 - Crop type
-- Crop growth stage
-
-Technical information such as soil properties and NDVI is collected automatically.
-
-## Core Flow
-
-```text
-Farmer
-  ↓
-Location + Crop + Growth Stage
-  ↓
-Automatic Data Collection
-  ├── SoilGrids → pH, Organic Carbon, Clay, Sand
-  ├── Weather API → Temperature, Rainfall, Forecast
-  ├── Sentinel-2 → NDVI / Crop Condition
-  └── AGMARKNET/Govt. Data → Mandi Prices
-  ↓
-Feature Engineering
-  ↓
-AI / ML Analysis
-  ├── Crop Condition / Advisory
-  └── Distress Risk Prediction
-  ↓
-Low / Medium / High Risk
-  ↓
-Farmer Advisory + Officer Alert
-```
-
-## Data Sources
-
-### Soil
-**SoilGrids / ISRIC WCS**
-- pH
-- Organic Carbon
-- Clay
-- Sand
-- Nitrogen and other available properties
-
-Location is used to retrieve soil information.
-
-### Weather
-Weather API:
-- Temperature
-- Humidity
-- Rainfall/precipitation
-- Forecast
-- Wind and other available parameters
-
-### Satellite
-**Sentinel-2**
-- B4 = Red
-- B8 = NIR
-
-```text
-NDVI = (B8 - B4) / (B8 + B4)
-```
-
-Cloud filtering should be applied before selecting the latest usable observation.
-
-### Mandi
-**AGMARKNET / Government data**
-- Commodity
-- Variety
-- Market/Mandi
-- Arrival date
-- Minimum price
-- Maximum price
-- Modal price
-
-Historical prices can be used to calculate price trends.
-
-## Crop Advisory
-
-```text
-Crop + Growth Stage
-        +
-Soil + Weather + NDVI
-        ↓
-ML / Rule-based Analysis
-        ↓
-Crop Condition
-        ↓
-Stage-specific Advisory
-```
-
-Example:
-
-```text
-Crop: Rice
-Stage: Flowering
-NDVI: Moderate
-Rainfall: Low
-Soil: Dry
-
-→ Irrigation advisory based on current conditions
-```
-
-## Distress Risk
-
-```text
-Crop Condition
-+ Weather Risk
-+ Mandi Price Trend
-+ Other available indicators
-        ↓
-Distress Risk Model
-        ↓
-Low / Medium / High
-```
-
-A high-risk case can be highlighted on the agriculture-officer dashboard.
-
-## ML Components
-
-### Crop Condition / Advisory Model
-Possible features:
-- Crop
 - Growth stage
-- Soil pH
-- Organic carbon
-- Clay
-- Sand
-- Rainfall
-- Temperature
-- Humidity
+- Soil properties
+- Weather and rainfall
 - NDVI
+- Mandi price trends
 
-Possible models:
-- Random Forest
-- XGBoost
+The model generates:
 
-### Distress Risk Model
-Possible features:
-- NDVI/crop condition
-- Weather risk
-- Rainfall
-- Temperature
-- Mandi price
-- Historical price trend
-- Crop
-- Location
+- Crop condition/stress indication
+- Crop-stage-specific advisory
+- Irrigation recommendation
+- Farmer distress-risk score
 
-Output:
-**Low / Medium / High**
+Possible models include **Random Forest and XGBoost**.
 
-## System Architecture
+## 🛰️ NDVI
 
-```text
-Frontend
-   ↓
-FastAPI Backend
-   ├── Soil Service
-   ├── Weather Service
-   ├── NDVI/Satellite Service
-   └── Mandi Service
-   ↓
-Feature Engineering
-   ↓
-ML Models
-   ├── Crop Advisory
-   └── Distress Risk
-   ↓
-Database
-   ↓
-Farmer Dashboard + Officer Dashboard
-```
+Sentinel-2 imagery is used to monitor crop condition.
 
-## Main Screens
-1. Farmer Home
-2. Weather
-3. Crop Advisory
-4. Mandi Prices
-5. Risk Score
-6. Officer Dashboard
+NDVI is calculated as:
 
-## Technology Stack
-- **Frontend:** React / HTML-CSS-JS
-- **Backend:** FastAPI + Python
-- **ML:** Pandas, NumPy, Scikit-learn, XGBoost
-- **Satellite:** Sentinel-2
-- **Soil:** SoilGrids WCS
-- **Weather:** Weather API
-- **Market:** AGMARKNET / Government data
-- **Database:** SQLite for prototype / PostgreSQL for scaling
+`NDVI = (NIR - Red) / (NIR + Red)`
 
-## 5-Day Hackathon Plan
+For Sentinel-2:
 
-### Day 1 — Data & APIs
-- SoilGrids integration
-- Weather API
-- Mandi data
-- NDVI pipeline
-- Data cleaning
+`Red = B4`  
+`NIR = B8`
 
-### Day 2 — ML
-- Prepare training data
-- Feature engineering
-- Train baseline models
-- Save models
+Cloud filtering is applied to select a valid/latest observation. Sentinel-1 can be integrated later for cloudy periods.
 
-### Day 3 — Backend
-- FastAPI endpoints
-- External API integration
-- ML model integration
-- End-to-end backend testing
+## 🗣️ Multilingual Voice Support
 
-### Day 4 — Frontend & Integration
-- Farmer screens
-- Officer dashboard
-- Connect frontend with backend
-- Display advisory, weather, mandi and risk
+The system supports regional-language interaction using **Speech-to-Text (STT)** and **Text-to-Speech (TTS)**.
 
-### Day 5 — Testing & PPT
-- End-to-end testing
-- Bug fixing
-- Demo scenario
-- Final PPT
-- Pitch and Q&A preparation
+Farmer Voice → STT → AI/ML Processing → Advisory → TTS → Regional-Language Voice
 
-## Future Scope
-- Sentinel-1 integration for cloudy conditions
-- More crop-specific models
-- More Indian languages
-- Voice-first interaction
-- Government-scheme recommendations
-- Automated officer alerts
-- Expansion from Odisha to other states
+This allows farmers to provide voice input and receive advisory in their preferred language.
 
-## Important
-This is a hackathon prototype. Predictions and advisories should be validated against reliable agricultural guidance before real-world deployment. NDVI is an indicator of vegetation condition and should not be treated as a standalone diagnosis.
+## 🛠️ Technology Stack
+
+**Frontend:** HTML, CSS, JavaScript, Leaflet.js, Chart.js
+
+**Backend:** Python, FastAPI, Uvicorn
+
+**Database:** PostgreSQL, SQLAlchemy
+
+**AI/ML:** Scikit-learn, XGBoost, Joblib
+
+**Data Processing:** Pandas, NumPy, SciPy
+
+**Data Sources:** SoilGrids, Open-Meteo, Sentinel-2, AGMARKNET/Mandi Data
+
+**Voice & Language:** Sarvam AI, STT, TTS
+
+## 📊 Expected Outputs
+
+**Crop Condition:** Healthy / Moderate Stress / High Stress
+
+**Distress Risk:** Low / Medium / High
+
+**Advisory:** Irrigation guidance, crop-management recommendations, weather-risk alerts and market-price insights.
+
+## ⚠️ Challenges & Mitigation
+
+- **Cloud cover:** Cloud filtering and latest valid Sentinel-2 observation
+- **Missing data:** Validation and fallback data
+- **Crop variability:** Crop and growth stage as model inputs
+- **Limited labelled data:** Historical data and careful model validation
+- **Prediction uncertainty:** Risk/confidence levels and real-world validation
+- **Low connectivity:** Lightweight text and voice interface
+
+## 🌍 Impact
+
+**Social:** Regional-language access and early farmer support.
+
+**Economic:** Reduced avoidable crop losses and better market decisions.
+
+**Environmental:** Efficient water usage and sustainable resource management.
+
+## 🔮 Future Scope
+
+- Expansion to more states and crops
+- Sentinel-1 integration for cloudy periods
+- More Indian regional languages
+- Improved distress-risk prediction
+- District-level risk monitoring
+
+## 📚 References
+
+- SoilGrids Documentation
+- Sentinel-2 Documentation
+- Open-Meteo Documentation
+- AGMARKNET
+- Sarvam AI Documentation
+- FastAPI Documentation
+- Scikit-learn Documentation
+- XGBoost Documentation
+
+## 👥 Team Pragyan
+
+**Smart Crop Advisory & Farmer Distress Early-Warning System**
+
+Built for **Smart India Hackathon 2026**.
