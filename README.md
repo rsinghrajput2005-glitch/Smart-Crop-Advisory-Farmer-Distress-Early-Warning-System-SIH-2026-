@@ -22,7 +22,7 @@ The farmer only needs to provide **location, crop type and growth stage**. The s
 
 ## 🔄 System Workflow
 
-Farmer Input → Data Collection → Data Processing → AI/ML Analysis → Advisory & Risk Detection → Farmer/Officer Dashboard
+**Farmer Input → Data Collection → Data Processing → AI/ML Analysis → Advisory & Risk Detection → Farmer/Officer Dashboard**
 
 The system collects soil data from **SoilGrids**, weather and forecast data from a **Weather API**, crop-condition information from **Sentinel-2**, and market information from **mandi data**. These parameters are processed and combined with crop type and growth stage before being passed to the AI/ML module.
 
@@ -64,9 +64,10 @@ The system follows a layered architecture where the frontend communicates with t
         Mandi Data              Predictions
              │                        │
              └───────────┬────────────┘
+                         │
                          ▼
               ┌─────────────────────┐
-              │ ADVISORY ENGINE     │
+              │   ADVISORY ENGINE   │
               │ Crop Advisory       │
               │ Irrigation Advice   │
               │ Distress Risk       │
@@ -78,6 +79,7 @@ The system follows a layered architecture where the frontend communicates with t
               │ Dashboard + Alerts  │
               │ Text + Voice        │
               └─────────────────────┘
+```
 
 ## 🤖 AI/ML
 
@@ -118,7 +120,7 @@ Cloud filtering is applied to select a valid/latest observation. Sentinel-1 can 
 
 The system supports regional-language interaction using **Speech-to-Text (STT)** and **Text-to-Speech (TTS)**.
 
-Farmer Voice → STT → AI/ML Processing → Advisory → TTS → Regional-Language Voice
+**Farmer Voice → STT → AI/ML Processing → Advisory → TTS → Regional-Language Voice**
 
 This allows farmers to provide voice input and receive advisory in their preferred language.
 
